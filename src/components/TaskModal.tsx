@@ -3,8 +3,8 @@ import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
 import { Task, Priority, Status } from '../types';
-import { MOCK_USERS } from '../mockData';
-import { AlertCircle, Clock, Flag } from 'lucide-react';
+import { MOCK_USERS, MOCK_TASKS } from '../mockData';
+import { AlertCircle, Clock, Flag, Layers } from 'lucide-react';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -12,6 +12,7 @@ interface TaskModalProps {
   onSave: (task: Partial<Task>) => void;
   initialData?: Task | null;
   title: string;
+  availableTasks?: Task[];
 }
 
 const priorityOptions = [
@@ -35,22 +36,35 @@ const userOptions = MOCK_USERS.map(user => ({
   icon: <img src={user.avatar} className="w-4 h-4 rounded-full" alt="" />
 }));
 
-export function TaskModal({ isOpen, onClose, onSave, initialData, title }: TaskModalProps) {
+export function TaskModal({ isOpen, onClose, onSave, initialData, title, availableTasks = MOCK_TASKS }: TaskModalProps) {
   const [taskTitle, setTaskTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
   const [status, setStatus] = useState<Status>('todo');
   const [assigneeId, setAssigneeId] = useState(MOCK_USERS[0].id);
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [parentId, setParentId] = useState<string | undefined>(undefined);
+
+  const parentOptions = [
+    { value: '', label: 'None (Main Task)', icon: <Layers className="w-4 h-4 text-zinc-400" /> },
+    ...availableTasks
+      .filter(t => t.id !== initialData?.id && !t.parentId)
+      .map(t => ({
+        value: t.id,
+        label: `${t.id}: ${t.title}`,
+        icon: <Layers className="w-4 h-4 text-indigo-500" />
+      }))
+  ];
 
   useEffect(() => {
     if (initialData) {
-      setTaskTitle(initialData.title);
-      setDescription(initialData.description);
-      setPriority(initialData.priority);
-      setStatus(initialData.status);
-      setAssigneeId(initialData.assigneeId);
-      setDueDate(initialData.dueDate);
+      setTaskTitle(initialData.title || '');
+      setDescription(initialData.description || '');
+      setPriority(initialData.priority || 'medium');
+      setStatus(initialData.status || 'todo');
+      setAssigneeId(initialData.assigneeId || MOCK_USERS[0].id);
+      setDueDate(initialData.dueDate || new Date().toISOString().split('T')[0]);
+      setParentId(initialData.parentId || '');
     } else {
       setTaskTitle('');
       setDescription('');
@@ -58,6 +72,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title }: TaskM
       setStatus('todo');
       setAssigneeId(MOCK_USERS[0].id);
       setDueDate(new Date().toISOString().split('T')[0]);
+      setParentId('');
     }
   }, [initialData, isOpen]);
 
@@ -71,6 +86,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title }: TaskM
       status,
       assigneeId,
       dueDate,
+      parentId: parentId || undefined,
     });
     onClose();
   };
@@ -113,6 +129,15 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title }: TaskM
             options={priorityOptions}
             value={priority}
             onChange={(val) => setPriority(val as Priority)}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+          <Select
+            label="Parent Task (Optional)"
+            options={parentOptions}
+            value={parentId || ''}
+            onChange={(val) => setParentId(val)}
           />
         </div>
 

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core';
 import { Task, Status } from '../types';
-import { MOCK_TASKS } from '../mockData';
+import { MOCK_TASKS, MOCK_USERS } from '../mockData';
 import { TaskCard } from './TaskCard';
 import { TaskModal } from './TaskModal';
 import { Button } from './ui/Button';
-import { Plus, MoreHorizontal } from 'lucide-react';
+import { Plus, MoreHorizontal, Edit2, Trash2, ArrowRight, Settings2 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { Dropdown, DropdownItem } from './ui/Dropdown';
 
 const COLUMNS: { id: Status; label: string }[] = [
   { id: 'backlog', label: 'Backlog' },
@@ -49,7 +50,7 @@ export function KanbanBoard() {
   };
 
   const handleAddTask = (taskData: Partial<Task>) => {
-    if (editingTask) {
+    if (editingTask && editingTask.id) {
       setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, ...taskData } as Task : t));
       setEditingTask(null);
       return;
@@ -61,7 +62,7 @@ export function KanbanBoard() {
       description: taskData.description || '',
       status: taskData.status || 'todo',
       priority: taskData.priority || 'medium',
-      assigneeId: taskData.assigneeId || MOCK_TASKS[0].assigneeId,
+      assigneeId: taskData.assigneeId || MOCK_USERS[0].id,
       dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
       tags: taskData.tags || [],
@@ -76,6 +77,10 @@ export function KanbanBoard() {
 
   const handleDeleteTask = (id: string) => {
     setTasks(prev => prev.filter(t => t.id !== id));
+  };
+
+  const handleClearColumn = (status: Status) => {
+    setTasks(prev => prev.filter(t => t.status !== status));
   };
 
   return (
@@ -105,6 +110,11 @@ export function KanbanBoard() {
               tasks={tasks.filter((t) => t.status === column.id)}
               onDeleteTask={handleDeleteTask}
               onEditTask={handleEditTask}
+              onClearColumn={() => handleClearColumn(column.id)}
+              onAddTask={() => {
+                setEditingTask({ status: column.id } as Task);
+                setIsModalOpen(true);
+              }}
             />
           ))}
         </div>
@@ -122,7 +132,7 @@ export function KanbanBoard() {
         }}
         onSave={handleAddTask}
         initialData={editingTask}
-        title={editingTask ? "Edit Task" : "Create New Task"}
+        title={editingTask && editingTask.id ? "Edit Task" : "Create New Task"}
       />
     </div>
   );
@@ -134,10 +144,12 @@ interface ColumnProps {
   tasks: Task[];
   onDeleteTask: (id: string) => void;
   onEditTask: (task: Task) => void;
+  onClearColumn: () => void;
+  onAddTask: () => void;
   key?: React.Key;
 }
 
-function Column({ id, label, tasks, onDeleteTask, onEditTask }: ColumnProps) {
+function Column({ id, label, tasks, onDeleteTask, onEditTask, onClearColumn, onAddTask }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: id,
   });
@@ -151,9 +163,31 @@ function Column({ id, label, tasks, onDeleteTask, onEditTask }: ColumnProps) {
             {tasks.length}
           </span>
         </div>
-        <button className="text-zinc-400 hover:text-zinc-600">
-          <MoreHorizontal className="w-4 h-4" />
-        </button>
+        <Dropdown
+          trigger={
+            <button className="text-zinc-400 hover:text-zinc-600 p-1 rounded-md hover:bg-zinc-100 transition-colors">
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          }
+        >
+          <DropdownItem onClick={onAddTask}>
+            <Plus className="w-3.5 h-3.5" />
+            Add Task
+          </DropdownItem>
+          <DropdownItem>
+            <Edit2 className="w-3.5 h-3.5" />
+            Rename Column
+          </DropdownItem>
+          <DropdownItem>
+            <ArrowRight className="w-3.5 h-3.5" />
+            Move All Tasks
+          </DropdownItem>
+          <div className="h-px bg-zinc-100 my-1" />
+          <DropdownItem variant="danger" onClick={onClearColumn}>
+            <Trash2 className="w-3.5 h-3.5" />
+            Clear Column
+          </DropdownItem>
+        </Dropdown>
       </div>
 
       <div
@@ -168,7 +202,10 @@ function Column({ id, label, tasks, onDeleteTask, onEditTask }: ColumnProps) {
           <TaskCard key={task.id} task={task} onDelete={onDeleteTask} onEdit={onEditTask} />
         ))}
         
-        <button className="w-full py-2 flex items-center justify-center gap-2 text-zinc-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all text-xs font-medium border border-dashed border-zinc-300 hover:border-indigo-200">
+        <button 
+          onClick={onAddTask}
+          className="w-full py-2 flex items-center justify-center gap-2 text-zinc-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all text-xs font-medium border border-dashed border-zinc-300 hover:border-indigo-200"
+        >
           <Plus className="w-3 h-3" />
           Add Task
         </button>

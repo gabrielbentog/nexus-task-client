@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Task, Priority, Status } from '../types';
+import { Task } from '../types';
 import { MOCK_TASKS, MOCK_USERS } from '../mockData';
 import { cn } from '../lib/utils';
 import { 
@@ -8,17 +8,20 @@ import {
   ArrowUpDown, 
   MoreHorizontal, 
   Calendar, 
-  User as UserIcon,
   AlertCircle,
   Clock,
   CheckCircle2,
   Trash2,
-  Edit2
+  Edit2,
+  Eye,
+  Plus,
+  Layers
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from './ui/Button';
 import { Dropdown, DropdownItem } from './ui/Dropdown';
 import { TaskModal } from './TaskModal';
+import { Link } from 'react-router-dom';
 
 const priorityConfig = {
   low: { color: 'text-zinc-500', bg: 'bg-zinc-100', label: 'Low' },
@@ -51,10 +54,25 @@ export function TasksTable() {
   };
 
   const handleUpdateTask = (taskData: Partial<Task>) => {
-    if (editingTask) {
+    if (editingTask && editingTask.id) {
       setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, ...taskData } as Task : t));
       setEditingTask(null);
+      return;
     }
+    
+    // Handle creation if needed (though TasksTable currently only edits)
+    const newTask: Task = {
+      id: `NEX-${tasks.length + 1}`,
+      title: taskData.title || 'Untitled Task',
+      description: taskData.description || '',
+      status: taskData.status || 'todo',
+      priority: taskData.priority || 'medium',
+      assigneeId: taskData.assigneeId || MOCK_USERS[0].id,
+      dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString(),
+      tags: taskData.tags || [],
+    };
+    setTasks([newTask, ...tasks]);
   };
 
   return (
@@ -69,9 +87,9 @@ export function TasksTable() {
             <Filter className="w-4 h-4" />
             Filter
           </Button>
-          <Button size="sm">
-            <ArrowUpDown className="w-4 h-4" />
-            Sort
+          <Button size="sm" onClick={() => setIsModalOpen(true)}>
+            <Plus className="w-4 h-4" />
+            Add Task
           </Button>
         </div>
       </div>
@@ -110,13 +128,32 @@ export function TasksTable() {
                 const assignee = MOCK_USERS.find(u => u.id === task.assigneeId);
                 const StatusIcon = statusConfig[task.status].icon;
                 const priority = priorityConfig[task.priority];
+                const subtaskCount = task.subtasks?.length || 0;
 
                 return (
                   <tr key={task.id} className="hover:bg-zinc-50/50 transition-colors group">
                     <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-indigo-600 mb-0.5">{task.id}</span>
-                        <span className="text-sm font-semibold text-zinc-900 line-clamp-1">{task.title}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="flex flex-col min-w-0">
+                          <Link 
+                            to={`/tasks/${task.id}`}
+                            className="text-xs font-bold text-indigo-600 mb-0.5 hover:text-indigo-700 transition-colors"
+                          >
+                            {task.id}
+                          </Link>
+                          <Link 
+                            to={`/tasks/${task.id}`}
+                            className="text-sm font-semibold text-zinc-900 line-clamp-1 hover:text-indigo-600 transition-colors"
+                          >
+                            {task.title}
+                          </Link>
+                        </div>
+                        {subtaskCount > 0 && (
+                          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-zinc-100 text-zinc-500 rounded-md shrink-0" title={`${subtaskCount} subtasks`}>
+                            <Layers className="w-3 h-3" />
+                            <span className="text-[10px] font-bold">{subtaskCount}</span>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -165,6 +202,10 @@ export function TasksTable() {
                           <Edit2 className="w-3.5 h-3.5" />
                           Edit Task
                         </DropdownItem>
+                        <DropdownItem as={Link} to={`/tasks/${task.id}`}>
+                          <Eye className="w-3.5 h-3.5" />
+                          View Details
+                        </DropdownItem>
                         <div className="h-px bg-zinc-100 my-1" />
                         <DropdownItem variant="danger" onClick={() => handleDeleteTask(task.id)}>
                           <Trash2 className="w-3.5 h-3.5" />
@@ -198,7 +239,7 @@ export function TasksTable() {
         }}
         onSave={handleUpdateTask}
         initialData={editingTask}
-        title="Edit Task"
+        title={editingTask && editingTask.id ? "Edit Task" : "Create New Task"}
       />
     </div>
   );

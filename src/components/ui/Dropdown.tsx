@@ -52,16 +52,26 @@ export function Dropdown({ trigger, children, align = 'right', className }: Drop
   );
 }
 
-interface DropdownItemProps {
+interface DropdownItemProps<T extends React.ElementType = 'button'> {
+  as?: T;
   onClick?: () => void;
   children: React.ReactNode;
   className?: string;
   variant?: 'default' | 'danger';
 }
 
-export function DropdownItem({ onClick, children, className, variant = 'default' }: DropdownItemProps) {
+export function DropdownItem<T extends React.ElementType = 'button'>({ 
+  as, 
+  onClick, 
+  children, 
+  className, 
+  variant = 'default',
+  ...props 
+}: DropdownItemProps<T> & React.ComponentPropsWithoutRef<T>) {
+  const Component = as || 'button';
+  
   return (
-    <button
+    <Component
       onClick={onClick}
       className={cn(
         "w-full text-left px-4 py-2 text-sm transition-colors flex items-center gap-2",
@@ -70,8 +80,9 @@ export function DropdownItem({ onClick, children, className, variant = 'default'
           : "text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900",
         className
       )}
+      {...props}
     >
       {children}
-    </button>
+    </Component>
   );
 }

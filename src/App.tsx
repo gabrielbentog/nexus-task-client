@@ -6,6 +6,7 @@ import { Dashboard } from './components/Dashboard';
 import { TeamPage } from './components/TeamPage';
 import { TasksTable } from './components/TasksTable';
 import { SettingsPage } from './components/SettingsPage';
+import { TaskDetailPage } from './components/TaskDetailPage';
 import { Login } from './components/Login';
 import { Signup } from './components/Signup';
 import { ForgotPassword } from './components/ForgotPassword';
@@ -14,6 +15,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
 
   if (!isAuthenticated) {
     return (
@@ -34,7 +36,7 @@ export default function App() {
     <ProjectProvider>
       <Router>
         <div className="flex min-h-screen bg-[#F8F9FA]">
-          <Sidebar />
+          <Sidebar isCollapsed={isSidebarCollapsed} onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)} />
           <div className="flex-1 flex flex-col min-w-0">
             <Header />
             <main className="flex-1 p-8 overflow-y-auto">
@@ -77,6 +79,19 @@ export default function App() {
                         transition={{ duration: 0.2 }}
                       >
                         <TasksTable />
+                      </motion.div>
+                    } 
+                  />
+                  <Route 
+                    path="/tasks/:taskId" 
+                    element={
+                      <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <TaskDetailPage />
                       </motion.div>
                     } 
                   />
