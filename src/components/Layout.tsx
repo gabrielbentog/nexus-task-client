@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { Button } from './ui/Button';
 import { useProject } from '../contexts/ProjectContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Dropdown, DropdownItem } from './ui/Dropdown';
 
 const navItems = [
@@ -55,8 +56,8 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                     onClick={() => setActiveProject(project)}
                     className={cn(
                       "w-full flex items-center justify-between p-2 rounded-lg text-sm transition-all",
-                      activeProject.id === project.id 
-                        ? "bg-indigo-50 text-indigo-600" 
+                      activeProject.id === project.id
+                        ? "bg-indigo-50 text-indigo-600"
                         : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
                     )}
                   >
@@ -97,8 +98,8 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
               to={item.path}
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group relative",
-                isActive 
-                  ? "bg-indigo-50 text-indigo-600" 
+                isActive
+                  ? "bg-indigo-50 text-indigo-600"
                   : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900",
                 isCollapsed && "justify-center px-0"
               )}
@@ -133,9 +134,9 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                 <span>TEAM</span>
                 <div className="flex -space-x-2">
                   {[1, 2, 3].map(i => (
-                    <img 
+                    <img
                       key={i}
-                      src={`https://picsum.photos/seed/${i}/32/32`} 
+                      src={`https://picsum.photos/seed/${i}/32/32`}
                       className="w-5 h-5 rounded-full border-2 border-white"
                       alt=""
                     />
@@ -151,8 +152,8 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
             </div>
           </div>
         )}
-        
-        <button 
+
+        <button
           onClick={onToggle}
           className="mt-4 w-full flex items-center justify-center p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 rounded-lg transition-all"
         >
@@ -165,11 +166,15 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
 
 export function Header() {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    navigate('/login');
-    window.location.reload();
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   };
 
   return (
@@ -177,9 +182,9 @@ export function Header() {
       <div className="flex items-center gap-4 flex-1">
         <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-          <input 
-            type="text" 
-            placeholder="Search tasks, projects..." 
+          <input
+            type="text"
+            placeholder="Search tasks, projects..."
             className="w-full pl-10 pr-4 py-2 bg-zinc-100 border-none rounded-full text-sm focus:ring-2 focus:ring-indigo-500/20 transition-all"
           />
         </div>
@@ -223,19 +228,19 @@ export function Header() {
           </div>
         </Dropdown>
         <div className="h-8 w-px bg-zinc-200 mx-2" />
-        
+
         <Dropdown
           trigger={
             <button className="flex items-center gap-3 hover:bg-zinc-50 p-1 rounded-xl transition-all">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold">Alex Rivera</p>
-                <p className="text-xs text-zinc-500">Product Designer</p>
+                <p className="text-sm font-semibold">{user?.name || 'User'}</p>
+                <p className="text-xs text-zinc-500">{user?.email || ''}</p>
               </div>
-              <img 
-                src="https://picsum.photos/seed/u1/100/100" 
-                alt="Avatar" 
-                className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
-              />
+              <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-indigo-100 flex items-center justify-center">
+                <span className="text-indigo-600 font-semibold text-sm">
+                  {user?.name?.charAt(0).toUpperCase() || 'U'}
+                </span>
+              </div>
             </button>
           }
         >

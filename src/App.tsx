@@ -11,11 +11,26 @@ import { Login } from './components/Login';
 import { Signup } from './components/Signup';
 import { ForgotPassword } from './components/ForgotPassword';
 import { ProjectProvider } from './contexts/ProjectContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 
-export default function App() {
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+function AppRoutes() {
+  const { isAuthenticated, isLoading } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA]">
+        <div className="text-center">
+          <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-200 animate-pulse">
+            <span className="text-white font-bold text-2xl">N</span>
+          </div>
+          <p className="text-zinc-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -42,8 +57,8 @@ export default function App() {
             <main className="flex-1 p-8 overflow-y-auto">
               <AnimatePresence mode="wait">
                 <Routes>
-                  <Route 
-                    path="/" 
+                  <Route
+                    path="/"
                     element={
                       <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -53,10 +68,10 @@ export default function App() {
                       >
                         <Dashboard />
                       </motion.div>
-                    } 
+                    }
                   />
-                  <Route 
-                    path="/board" 
+                  <Route
+                    path="/board"
                     element={
                       <motion.div
                         initial={{ opacity: 0, scale: 0.98 }}
@@ -67,10 +82,10 @@ export default function App() {
                       >
                         <KanbanBoard />
                       </motion.div>
-                    } 
+                    }
                   />
-                  <Route 
-                    path="/tasks" 
+                  <Route
+                    path="/tasks"
                     element={
                       <motion.div
                         initial={{ opacity: 0, x: 20 }}
@@ -80,10 +95,10 @@ export default function App() {
                       >
                         <TasksTable />
                       </motion.div>
-                    } 
+                    }
                   />
-                  <Route 
-                    path="/tasks/:taskId" 
+                  <Route
+                    path="/tasks/:taskId"
                     element={
                       <motion.div
                         initial={{ opacity: 0, x: 20 }}
@@ -93,10 +108,10 @@ export default function App() {
                       >
                         <TaskDetailPage />
                       </motion.div>
-                    } 
+                    }
                   />
-                  <Route 
-                    path="/team" 
+                  <Route
+                    path="/team"
                     element={
                       <motion.div
                         initial={{ opacity: 0, x: 20 }}
@@ -106,10 +121,10 @@ export default function App() {
                       >
                         <TeamPage />
                       </motion.div>
-                    } 
+                    }
                   />
-                  <Route 
-                    path="/settings" 
+                  <Route
+                    path="/settings"
                     element={
                       <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -119,7 +134,7 @@ export default function App() {
                       >
                         <SettingsPage />
                       </motion.div>
-                    } 
+                    }
                   />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
@@ -129,5 +144,13 @@ export default function App() {
         </div>
       </Router>
     </ProjectProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 }
