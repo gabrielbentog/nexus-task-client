@@ -10,6 +10,7 @@ import { Dropdown, DropdownItem } from './ui/Dropdown';
 interface TaskCardProps {
   task: Task;
   onDelete?: (id: string) => void;
+  onEdit?: (task: Task) => void;
   key?: React.Key;
 }
 
@@ -20,7 +21,7 @@ const priorityColors = {
   urgent: 'bg-red-50 text-red-600',
 };
 
-export function TaskCard({ task, onDelete }: TaskCardProps) {
+export function TaskCard({ task, onDelete, onEdit }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
   });
@@ -57,7 +58,7 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
               </button>
             }
           >
-            <DropdownItem>
+            <DropdownItem onClick={() => onEdit?.(task)}>
               <Edit2 className="w-3.5 h-3.5" />
               Edit Task
             </DropdownItem>

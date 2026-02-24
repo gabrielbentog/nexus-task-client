@@ -18,6 +18,7 @@ import {
 import { format } from 'date-fns';
 import { Button } from './ui/Button';
 import { Dropdown, DropdownItem } from './ui/Dropdown';
+import { TaskModal } from './TaskModal';
 
 const priorityConfig = {
   low: { color: 'text-zinc-500', bg: 'bg-zinc-100', label: 'Low' },
@@ -37,6 +38,8 @@ const statusConfig = {
 export function TasksTable() {
   const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const filteredTasks = tasks.filter(task => 
     task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -45,6 +48,13 @@ export function TasksTable() {
 
   const handleDeleteTask = (id: string) => {
     setTasks(prev => prev.filter(t => t.id !== id));
+  };
+
+  const handleUpdateTask = (taskData: Partial<Task>) => {
+    if (editingTask) {
+      setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, ...taskData } as Task : t));
+      setEditingTask(null);
+    }
   };
 
   return (
@@ -148,7 +158,10 @@ export function TasksTable() {
                           </button>
                         }
                       >
-                        <DropdownItem>
+                        <DropdownItem onClick={() => {
+                          setEditingTask(task);
+                          setIsModalOpen(true);
+                        }}>
                           <Edit2 className="w-3.5 h-3.5" />
                           Edit Task
                         </DropdownItem>
@@ -176,6 +189,17 @@ export function TasksTable() {
           </div>
         )}
       </div>
+
+      <TaskModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingTask(null);
+        }}
+        onSave={handleUpdateTask}
+        initialData={editingTask}
+        title="Edit Task"
+      />
     </div>
   );
 }

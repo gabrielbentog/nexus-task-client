@@ -5,6 +5,7 @@ import { KanbanBoard } from './components/KanbanBoard';
 import { Dashboard } from './components/Dashboard';
 import { TeamPage } from './components/TeamPage';
 import { TasksTable } from './components/TasksTable';
+import { SettingsPage } from './components/SettingsPage';
 import { Login } from './components/Login';
 import { Signup } from './components/Signup';
 import { ForgotPassword } from './components/ForgotPassword';
@@ -89,6 +90,19 @@ export default function App() {
                         transition={{ duration: 0.2 }}
                       >
                         <TeamPage />
+                      </motion.div>
+                    } 
+                  />
+                  <Route 
+                    path="/settings" 
+                    element={
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <SettingsPage />
                       </motion.div>
                     } 
                   />

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
@@ -23,6 +23,17 @@ const stats = [
 ];
 
 export function Dashboard() {
+  const [range, setRange] = useState('7');
+
+  const chartData = useMemo(() => {
+    const days = parseInt(range);
+    return Array.from({ length: days }).map((_, i) => ({
+      name: days <= 7 ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i % 7] : `Day ${i + 1}`,
+      completed: Math.floor(Math.random() * 10) + 2,
+      created: Math.floor(Math.random() * 8) + 3,
+    }));
+  }, [range]);
+
   return (
     <div className="space-y-8">
       <div>
@@ -59,13 +70,13 @@ export function Dashboard() {
                 { value: '30', label: 'Last 30 days' },
                 { value: '90', label: 'Last 90 days' },
               ]}
-              value="7"
-              onChange={() => {}}
+              value={range}
+              onChange={(val) => setRange(val)}
             />
           </div>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
+              <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.1}/>

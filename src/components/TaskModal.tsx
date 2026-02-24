@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
 import { Task, Priority, Status } from '../types';
 import { MOCK_USERS } from '../mockData';
-import { AlertCircle, Clock, Flag, User as UserIcon } from 'lucide-react';
+import { AlertCircle, Clock, Flag } from 'lucide-react';
 
-interface CreateTaskModalProps {
+interface TaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (task: Partial<Task>) => void;
+  initialData?: Task | null;
+  title: string;
 }
 
 const priorityOptions = [
@@ -30,46 +32,59 @@ const statusOptions = [
 const userOptions = MOCK_USERS.map(user => ({
   value: user.id,
   label: user.name,
-  icon: <img src={user.avatar} className="w-4 h-4 rounded-full" />
+  icon: <img src={user.avatar} className="w-4 h-4 rounded-full" alt="" />
 }));
 
-export function CreateTaskModal({ isOpen, onClose, onSave }: CreateTaskModalProps) {
-  const [title, setTitle] = useState('');
+export function TaskModal({ isOpen, onClose, onSave, initialData, title }: TaskModalProps) {
+  const [taskTitle, setTaskTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
   const [status, setStatus] = useState<Status>('todo');
   const [assigneeId, setAssigneeId] = useState(MOCK_USERS[0].id);
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
 
+  useEffect(() => {
+    if (initialData) {
+      setTaskTitle(initialData.title);
+      setDescription(initialData.description);
+      setPriority(initialData.priority);
+      setStatus(initialData.status);
+      setAssigneeId(initialData.assigneeId);
+      setDueDate(initialData.dueDate);
+    } else {
+      setTaskTitle('');
+      setDescription('');
+      setPriority('medium');
+      setStatus('todo');
+      setAssigneeId(MOCK_USERS[0].id);
+      setDueDate(new Date().toISOString().split('T')[0]);
+    }
+  }, [initialData, isOpen]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
-      title,
+      ...initialData,
+      title: taskTitle,
       description,
       priority,
       status,
       assigneeId,
       dueDate,
-      tags: [],
     });
     onClose();
-    // Reset form
-    setTitle('');
-    setDescription('');
-    setPriority('medium');
-    setStatus('todo');
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create New Task">
+    <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-1.5">
           <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider ml-1">Task Title</label>
           <input
             type="text"
             required
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            value={taskTitle}
+            onChange={(e) => setTaskTitle(e.target.value)}
             placeholder="e.g. Implement user authentication"
             className="w-full px-4 py-2.5 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
           />
@@ -124,7 +139,7 @@ export function CreateTaskModal({ isOpen, onClose, onSave }: CreateTaskModalProp
             Cancel
           </Button>
           <Button type="submit" className="flex-1">
-            Create Task
+            {initialData ? 'Save Changes' : 'Create Task'}
           </Button>
         </div>
       </form>

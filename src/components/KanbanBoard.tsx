@@ -3,7 +3,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, u
 import { Task, Status } from '../types';
 import { MOCK_TASKS } from '../mockData';
 import { TaskCard } from './TaskCard';
-import { CreateTaskModal } from './CreateTaskModal';
+import { TaskModal } from './TaskModal';
 import { Button } from './ui/Button';
 import { Plus, MoreHorizontal } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -19,6 +19,7 @@ const COLUMNS: { id: Status; label: string }[] = [
 export function KanbanBoard() {
   const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const sensors = useSensors(
@@ -48,6 +49,12 @@ export function KanbanBoard() {
   };
 
   const handleAddTask = (taskData: Partial<Task>) => {
+    if (editingTask) {
+      setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, ...taskData } as Task : t));
+      setEditingTask(null);
+      return;
+    }
+
     const newTask: Task = {
       id: `NEX-${tasks.length + 1}`,
       title: taskData.title || 'Untitled Task',
@@ -60,6 +67,11 @@ export function KanbanBoard() {
       tags: taskData.tags || [],
     };
     setTasks([newTask, ...tasks]);
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setIsModalOpen(true);
   };
 
   const handleDeleteTask = (id: string) => {
@@ -92,6 +104,7 @@ export function KanbanBoard() {
               label={column.label}
               tasks={tasks.filter((t) => t.status === column.id)}
               onDeleteTask={handleDeleteTask}
+              onEditTask={handleEditTask}
             />
           ))}
         </div>
@@ -101,10 +114,15 @@ export function KanbanBoard() {
         </DragOverlay>
       </DndContext>
 
-      <CreateTaskModal
+      <TaskModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingTask(null);
+        }}
         onSave={handleAddTask}
+        initialData={editingTask}
+        title={editingTask ? "Edit Task" : "Create New Task"}
       />
     </div>
   );
@@ -115,10 +133,11 @@ interface ColumnProps {
   label: string;
   tasks: Task[];
   onDeleteTask: (id: string) => void;
+  onEditTask: (task: Task) => void;
   key?: React.Key;
 }
 
-function Column({ id, label, tasks, onDeleteTask }: ColumnProps) {
+function Column({ id, label, tasks, onDeleteTask, onEditTask }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: id,
   });
@@ -146,7 +165,7 @@ function Column({ id, label, tasks, onDeleteTask }: ColumnProps) {
         )}
       >
         {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} onDelete={onDeleteTask} />
+          <TaskCard key={task.id} task={task} onDelete={onDeleteTask} onEdit={onEditTask} />
         ))}
         
         <button className="w-full py-2 flex items-center justify-center gap-2 text-zinc-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all text-xs font-medium border border-dashed border-zinc-300 hover:border-indigo-200">
