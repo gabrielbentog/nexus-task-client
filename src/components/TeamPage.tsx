@@ -1,8 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MOCK_USERS } from '../mockData';
-import { Mail, Phone, MoreVertical, Shield, User as UserIcon } from 'lucide-react';
+import { Mail, Phone, MoreVertical, Shield, User as UserIcon, Trash2, Edit2, ShieldAlert } from 'lucide-react';
+import { Dropdown, DropdownItem } from './ui/Dropdown';
+import { InviteMemberModal } from './InviteMemberModal';
+import { Button } from './ui/Button';
 
 export function TeamPage() {
+  const [members, setMembers] = useState(MOCK_USERS);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+
+  const handleInvite = (data: { email: string; role: string }) => {
+    const newMember = {
+      id: `u${members.length + 1}`,
+      name: data.email.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
+      role: data.role,
+      avatar: `https://picsum.photos/seed/${data.email}/100/100`,
+    };
+    setMembers([...members, newMember]);
+  };
+
+  const removeMember = (id: string) => {
+    setMembers(members.filter(m => m.id !== id));
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -10,13 +30,13 @@ export function TeamPage() {
           <h2 className="text-2xl font-bold">Team Members</h2>
           <p className="text-zinc-500 text-sm">Manage your team and their roles within the project.</p>
         </div>
-        <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
+        <Button onClick={() => setIsInviteModalOpen(true)}>
           Invite Member
-        </button>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {MOCK_USERS.map((user) => (
+        {members.map((user) => (
           <div key={user.id} className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-start justify-between mb-4">
               <img 
@@ -24,9 +44,27 @@ export function TeamPage() {
                 alt={user.name} 
                 className="w-16 h-16 rounded-2xl object-cover border-2 border-zinc-50"
               />
-              <button className="text-zinc-400 hover:text-zinc-600">
-                <MoreVertical className="w-5 h-5" />
-              </button>
+              <Dropdown
+                trigger={
+                  <button className="text-zinc-400 hover:text-zinc-600 p-1 rounded-lg hover:bg-zinc-50 transition-colors">
+                    <MoreVertical className="w-5 h-5" />
+                  </button>
+                }
+              >
+                <DropdownItem>
+                  <Edit2 className="w-4 h-4" />
+                  Edit Role
+                </DropdownItem>
+                <DropdownItem>
+                  <ShieldAlert className="w-4 h-4" />
+                  Manage Permissions
+                </DropdownItem>
+                <div className="h-px bg-zinc-100 my-1" />
+                <DropdownItem variant="danger" onClick={() => removeMember(user.id)}>
+                  <Trash2 className="w-4 h-4" />
+                  Remove from Team
+                </DropdownItem>
+              </Dropdown>
             </div>
             
             <div className="mb-6">
@@ -56,6 +94,11 @@ export function TeamPage() {
           </div>
         ))}
       </div>
+      <InviteMemberModal
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+        onInvite={handleInvite}
+      />
     </div>
   );
 }
