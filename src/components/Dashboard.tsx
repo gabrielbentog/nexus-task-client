@@ -1,5 +1,7 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
+import { Button } from './ui/Button';
+import { Select } from './ui/Select';
 import { ArrowUpRight, ArrowDownRight, Users, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { MOCK_TASKS } from '../mockData';
 
@@ -50,10 +52,16 @@ export function Dashboard() {
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold">Task Velocity</h3>
-            <select className="text-sm border-none bg-zinc-100 rounded-lg px-3 py-1.5 focus:ring-0">
-              <option>Last 7 days</option>
-              <option>Last 30 days</option>
-            </select>
+            <Select
+              className="w-40"
+              options={[
+                { value: '7', label: 'Last 7 days' },
+                { value: '30', label: 'Last 30 days' },
+                { value: '90', label: 'Last 90 days' },
+              ]}
+              value="7"
+              onChange={() => {}}
+            />
           </div>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -113,9 +121,9 @@ export function Dashboard() {
               </div>
             ))}
           </div>
-          <button className="w-full mt-8 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors">
+          <Button variant="ghost" className="w-full mt-8 text-indigo-600">
             View all activity
-          </button>
+          </Button>
         </div>
       </div>
     </div>

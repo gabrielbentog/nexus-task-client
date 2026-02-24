@@ -2,12 +2,14 @@ import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { Task, User } from '../types';
 import { MOCK_USERS } from '../mockData';
-import { Calendar, Tag, MoreHorizontal } from 'lucide-react';
+import { Calendar, Tag, MoreHorizontal, Trash2, Edit2, ExternalLink } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
+import { Dropdown, DropdownItem } from './ui/Dropdown';
 
 interface TaskCardProps {
   task: Task;
+  onDelete?: (id: string) => void;
   key?: React.Key;
 }
 
@@ -18,7 +20,7 @@ const priorityColors = {
   urgent: 'bg-red-50 text-red-600',
 };
 
-export function TaskCard({ task }: TaskCardProps) {
+export function TaskCard({ task, onDelete }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
   });
@@ -47,9 +49,29 @@ export function TaskCard({ task }: TaskCardProps) {
         )}>
           {task.priority}
         </span>
-        <button className="text-zinc-400 hover:text-zinc-600">
-          <MoreHorizontal className="w-4 h-4" />
-        </button>
+        <div onPointerDown={(e) => e.stopPropagation()}>
+          <Dropdown 
+            trigger={
+              <button className="text-zinc-400 hover:text-zinc-600 p-1 rounded-md hover:bg-zinc-100 transition-colors">
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            }
+          >
+            <DropdownItem>
+              <Edit2 className="w-3.5 h-3.5" />
+              Edit Task
+            </DropdownItem>
+            <DropdownItem>
+              <ExternalLink className="w-3.5 h-3.5" />
+              View Details
+            </DropdownItem>
+            <div className="h-px bg-zinc-100 my-1" />
+            <DropdownItem variant="danger" onClick={() => onDelete?.(task.id)}>
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete Task
+            </DropdownItem>
+          </Dropdown>
+        </div>
       </div>
 
       <h3 className="font-semibold text-sm mb-2 line-clamp-2">{task.title}</h3>

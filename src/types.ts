@@ -1,5 +1,6 @@
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
 export type Status = 'backlog' | 'todo' | 'in-progress' | 'review' | 'done';
+export type TaskType = 'feature' | 'bug' | 'task';
 
 export interface User {
   id: string;
@@ -14,9 +15,12 @@ export interface Task {
   description: string;
   status: Status;
   priority: Priority;
+  type: TaskType;
   assigneeId: string;
   dueDate: string;
   createdAt: string;
+  completedAt?: string;
+  storyPoints: number;
   tags: string[];
 }
 
