@@ -49,15 +49,15 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
               className="w-52"
               align="left"
               trigger={
-                <button className="flex items-center gap-3 w-full p-2 hover:bg-zinc-50 rounded-xl transition-all group">
+                <button className="flex items-center gap-2.5 w-52 px-2.5 py-2 hover:bg-zinc-50 rounded-xl transition-all group h-[52px]">
                   <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-                    <span className="text-white font-bold text-lg">{activeProject.name[0]}</span>
+                    <span className="text-white font-bold text-base">{activeProject.name[0]}</span>
                   </div>
-                  <div className="flex-1 text-left min-w-0">
-                    <h1 className="font-bold text-sm tracking-tight truncate">{activeProject.name}</h1>
-                    <p className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">{activeProject.key}</p>
+                  <div className="flex-1 text-left min-w-0 overflow-hidden">
+                    <h1 className="font-bold text-sm tracking-tight truncate leading-tight">{activeProject.name}</h1>
+                    <p className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider mt-0.5">{activeProject.key}</p>
                   </div>
-                  <ChevronDown className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+                  <ChevronDown className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 transition-colors shrink-0" />
                 </button>
               }
             >
@@ -69,22 +69,22 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                       key={project.id}
                       onClick={() => setActiveProject(project)}
                       className={cn(
-                        "w-full flex items-center justify-between p-2 rounded-lg text-sm transition-all",
+                        "w-full flex items-center justify-between p-2 rounded-lg text-sm transition-all min-h-[40px]",
                         activeProject.id === project.id
                           ? "bg-indigo-50 text-indigo-600"
                           : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
                       )}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className={cn(
-                          "w-6 h-6 rounded flex items-center justify-center text-xs font-bold",
+                          "w-6 h-6 rounded flex items-center justify-center text-xs font-bold shrink-0",
                           activeProject.id === project.id ? "bg-indigo-600 text-white" : "bg-zinc-100 text-zinc-500"
                         )}>
                           {project.name[0]}
                         </div>
-                        <span>{project.name}</span>
+                        <span className="truncate">{project.name}</span>
                       </div>
-                      {activeProject.id === project.id && <Check className="w-3.5 h-3.5" />}
+                      {activeProject.id === project.id && <Check className="w-3.5 h-3.5 shrink-0 ml-2" />}
                     </button>
                   ))}
                 </div>
