@@ -1,60 +1,91 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
-import { ArrowUpRight, ArrowDownRight, Users, CheckCircle2, Clock, AlertCircle, MessageSquare, Zap, Target, TrendingUp } from 'lucide-react';
-import { MOCK_TASKS, MOCK_USERS } from '../mockData';
-
-const data = [
-  { name: 'Mon', completed: 4, created: 6 },
-  { name: 'Tue', completed: 7, created: 5 },
-  { name: 'Wed', completed: 5, created: 8 },
-  { name: 'Thu', completed: 10, created: 7 },
-  { name: 'Fri', completed: 8, created: 6 },
-  { name: 'Sat', completed: 3, created: 2 },
-  { name: 'Sun', completed: 2, created: 1 },
-];
-
-const stats = [
-  { label: 'Total Tasks', value: '42', icon: CheckCircle2, trend: '+12%', trendUp: true, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { label: 'In Progress', value: '12', icon: Clock, trend: '+2', trendUp: true, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  { label: 'Team Members', value: '8', icon: Users, trend: '0', trendUp: true, color: 'text-blue-600', bg: 'bg-blue-50' },
-  { label: 'Overdue', value: '3', icon: AlertCircle, trend: '-1', trendUp: false, color: 'text-rose-600', bg: 'bg-rose-50' },
-];
+import { DashboardSkeleton } from './ui/Skeleton';
+import { ArrowUpRight, ArrowDownRight, Users, CheckCircle2, Clock, AlertCircle, MessageSquare, Zap, Target, TrendingUp, Loader2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { dashboardService, DashboardStats, VelocityData, HealthData, ActivityItem } from '../services/dashboardService';
 
 export function Dashboard() {
+  const { user } = useAuth();
   const [range, setRange] = useState('7');
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [velocityData, setVelocityData] = useState<VelocityData[]>([]);
+  const [healthData, setHealthData] = useState<HealthData | null>(null);
+  const [activityData, setActivityData] = useState<ActivityItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const chartData = useMemo(() => {
-    const days = parseInt(range);
-    return Array.from({ length: days }).map((_, i) => ({
-      name: days <= 7 ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i % 7] : `Day ${i + 1}`,
-      completed: Math.floor(Math.random() * 10) + 2,
-      created: Math.floor(Math.random() * 8) + 3,
-    }));
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const [statsData, velocityResponse, healthResponse, activityResponse] = await Promise.all([
+        dashboardService.getStats(),
+        dashboardService.getVelocity(parseInt(range)),
+        dashboardService.getHealth(),
+        dashboardService.getActivity(),
+      ]);
+
+      setStats(statsData);
+      setVelocityData(velocityResponse);
+      setHealthData(healthResponse);
+      setActivityData(activityResponse);
+    } catch (err: any) {
+      console.error('Failed to load dashboard data:', err);
+      setError(err.message || 'Failed to load dashboard data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardData();
   }, [range]);
+
+  const firstName = user?.name?.split(' ')[0] || 'User';
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+          <p className="text-sm font-semibold text-red-600 mb-2">Failed to load dashboard</p>
+          <p className="text-xs text-zinc-500 mb-4">{error}</p>
+          <Button onClick={loadDashboardData} size="sm">Try Again</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const statsCards = stats ? [
+    { label: 'Total Tasks', value: stats.totalTasks.value.toString(), icon: CheckCircle2, trend: stats.totalTasks.trend, trendUp: stats.totalTasks.trendUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'In Progress', value: stats.inProgress.value.toString(), icon: Clock, trend: stats.inProgress.trend, trendUp: stats.inProgress.trendUp, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'Team Members', value: stats.teamMembers.value.toString(), icon: Users, trend: stats.teamMembers.trend, trendUp: stats.teamMembers.trendUp, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Overdue', value: stats.overdue.value.toString(), icon: AlertCircle, trend: stats.overdue.trend, trendUp: stats.overdue.trendUp, color: 'text-rose-600', bg: 'bg-rose-50' },
+  ] : [];
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Good morning, Alex</h2>
+          <h2 className="text-2xl font-bold">Good morning, {firstName}</h2>
           <p className="text-zinc-500 text-sm">Here's what's happening with your projects today.</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex -space-x-2 mr-2">
-            {MOCK_USERS.slice(0, 4).map(user => (
-              <img key={user.id} src={user.avatar} className="w-8 h-8 rounded-full border-2 border-white shadow-sm" alt="" />
-            ))}
-            <div className="w-8 h-8 rounded-full bg-zinc-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-zinc-500">+4</div>
-          </div>
           <Button variant="outline" size="sm">Share</Button>
           <Button size="sm">Export Report</Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => (
+        {statsCards.map((stat) => (
           <div key={stat.label} className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className={`${stat.bg} p-2 rounded-xl`}>
@@ -87,40 +118,46 @@ export function Dashboard() {
             />
           </div>
           <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 12, fill: '#94A3B8' }}
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 12, fill: '#94A3B8' }}
-                />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="completed" 
-                  stroke="#4F46E5" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorCompleted)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {velocityData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={velocityData}>
+                  <defs>
+                    <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.1} />
+                      <stop offset="95%" stopColor="#4F46E5" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                  <XAxis
+                    dataKey="date"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#94A3B8' }}
+                    dy={10}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#94A3B8' }}
+                  />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="completed"
+                    stroke="#4F46E5"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#colorCompleted)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-zinc-500 text-sm">
+                No velocity data available
+              </div>
+            )}
           </div>
         </div>
 
@@ -141,7 +178,9 @@ export function Dashboard() {
                     <p className="text-[10px] text-zinc-500">Tasks per week</p>
                   </div>
                 </div>
-                <span className="text-sm font-bold text-emerald-600">+24%</span>
+                <span className="text-sm font-bold text-emerald-600">
+                  {healthData?.efficiency?.value != null ? `${Number(healthData.efficiency.value) > 0 ? '+' : ''}${Number(healthData.efficiency.value).toFixed(1)}%` : 'N/A'}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -153,7 +192,9 @@ export function Dashboard() {
                     <p className="text-[10px] text-zinc-500">Story points</p>
                   </div>
                 </div>
-                <span className="text-sm font-bold text-indigo-600">8.4</span>
+                <span className="text-sm font-bold text-indigo-600">
+                  {healthData?.velocity?.value != null ? Number(healthData.velocity.value).toFixed(1) : 'N/A'}
+                </span>
               </div>
             </div>
             <div className="mt-8 pt-6 border-t border-zinc-100">
@@ -167,21 +208,25 @@ export function Dashboard() {
               Recent Activity
             </h3>
             <div className="space-y-6">
-              {[
-                { user: 'Sarah', action: 'moved', target: 'NEX-42', time: '2m ago' },
-                { user: 'John', action: 'commented on', target: 'NEX-15', time: '15m ago' },
-                { user: 'Alex', action: 'completed', target: 'NEX-08', time: '1h ago' },
-              ].map((activity, i) => (
-                <div key={i} className="flex gap-3">
-                  <img src={`https://picsum.photos/seed/${activity.user}/32/32`} className="w-8 h-8 rounded-full shrink-0" alt="" />
-                  <div className="min-w-0">
-                    <p className="text-xs text-zinc-600">
-                      <span className="font-bold text-zinc-900">{activity.user}</span> {activity.action} <span className="font-bold text-indigo-600">{activity.target}</span>
-                    </p>
-                    <p className="text-[10px] text-zinc-400 mt-0.5">{activity.time}</p>
-                  </div>
-                </div>
-              ))}
+              {activityData.length > 0 ? (
+                activityData.slice(0, 3).map((activity) => {
+                  const userName = activity.user?.name || 'Unknown User';
+                  const avatarUrl = activity.user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=4F46E5&color=fff`;
+                  return (
+                    <div key={activity.id} className="flex gap-3">
+                      <img src={avatarUrl} className="w-8 h-8 rounded-full shrink-0" alt="" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-zinc-600">
+                          <span className="font-bold text-zinc-900">{userName}</span> {activity.action} <span className="font-bold text-indigo-600">{activity.target}</span>
+                        </p>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">{activity.time}</p>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-zinc-500 text-center py-4">No recent activity</p>
+              )}
             </div>
           </div>
         </div>
