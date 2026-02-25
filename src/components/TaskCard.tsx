@@ -1,7 +1,6 @@
 import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { Task } from '../types';
-import { MOCK_USERS } from '../mockData';
 import { Calendar, MoreHorizontal, Trash2, Edit2, Eye, Layers } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
@@ -10,7 +9,7 @@ import { Link } from 'react-router-dom';
 
 interface TaskCardProps {
   task: Task;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string | number) => void;
   onEdit?: (task: Task) => void;
   key?: React.Key;
 }
@@ -27,8 +26,8 @@ export function TaskCard({ task, onDelete, onEdit }: TaskCardProps) {
     id: task.id,
   });
 
-  const assignee = MOCK_USERS.find(u => u.id === task.assigneeId);
-  const subtaskCount = task.subtasks?.length || 0;
+  const assignee = task.assignee;
+  const subtaskCount = task.subtaskCount || task.subtasks?.length || 0;
 
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -46,7 +45,7 @@ export function TaskCard({ task, onDelete, onEdit }: TaskCardProps) {
       )}
     >
       <div className="flex items-start justify-between mb-3">
-        <Link 
+        <Link
           to={`/tasks/${task.id}`}
           onPointerDown={(e) => e.stopPropagation()}
           className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider hover:text-indigo-600 transition-colors"
@@ -54,7 +53,7 @@ export function TaskCard({ task, onDelete, onEdit }: TaskCardProps) {
           {task.id}
         </Link>
         <div onPointerDown={(e) => e.stopPropagation()}>
-          <Dropdown 
+          <Dropdown
             trigger={
               <button className="text-zinc-400 hover:text-zinc-600 p-1 rounded-md hover:bg-zinc-100 transition-colors">
                 <MoreHorizontal className="w-4 h-4" />
@@ -78,14 +77,14 @@ export function TaskCard({ task, onDelete, onEdit }: TaskCardProps) {
         </div>
       </div>
 
-      <Link 
+      <Link
         to={`/tasks/${task.id}`}
         onPointerDown={(e) => e.stopPropagation()}
         className="block font-semibold text-sm mb-2 line-clamp-2 hover:text-indigo-600 transition-colors"
       >
         {task.title}
       </Link>
-      
+
       <div className="flex flex-wrap gap-1 mb-4">
         <span className={cn(
           "text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md mr-1",
@@ -93,7 +92,7 @@ export function TaskCard({ task, onDelete, onEdit }: TaskCardProps) {
         )}>
           {task.priority}
         </span>
-        {task.tags.map(tag => (
+        {task.tags?.map(tag => (
           <span key={tag} className="text-[10px] bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded">
             #{tag}
           </span>
@@ -102,10 +101,12 @@ export function TaskCard({ task, onDelete, onEdit }: TaskCardProps) {
 
       <div className="flex items-center justify-between mt-auto pt-3 border-t border-zinc-50">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-zinc-400">
-            <Calendar className="w-3 h-3" />
-            <span className="text-[10px]">{format(new Date(task.dueDate), 'MMM d')}</span>
-          </div>
+          {task.dueDate && (
+            <div className="flex items-center gap-1.5 text-zinc-400">
+              <Calendar className="w-3 h-3" />
+              <span className="text-[10px]">{format(new Date(task.dueDate), 'MMM d')}</span>
+            </div>
+          )}
           {subtaskCount > 0 && (
             <div className="flex items-center gap-1 text-zinc-400" title={`${subtaskCount} subtasks`}>
               <Layers className="w-3 h-3" />
@@ -114,9 +115,9 @@ export function TaskCard({ task, onDelete, onEdit }: TaskCardProps) {
           )}
         </div>
         {assignee && (
-          <img 
-            src={assignee.avatar} 
-            alt={assignee.name} 
+          <img
+            src={assignee.avatarUrl || assignee.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(assignee.name)}&background=4F46E5&color=fff`}
+            alt={assignee.name}
             className="w-6 h-6 rounded-full border border-white"
             title={assignee.name}
           />

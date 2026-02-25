@@ -1,27 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core';
-import { Task, Status } from '../types';
-import { MOCK_TASKS, MOCK_USERS } from '../mockData';
+import { Task, ProjectColumn } from '../types';
 import { TaskCard } from './TaskCard';
 import { TaskModal } from './TaskModal';
+import { ColumnModal } from './ColumnModal';
+import { DeleteColumnModal } from './DeleteColumnModal';
 import { Button } from './ui/Button';
-import { Plus, MoreHorizontal, Edit2, Trash2, ArrowRight, Settings2 } from 'lucide-react';
+import { KanbanBoardSkeleton } from './ui/Skeleton';
+import { Plus, MoreHorizontal, Edit2, Trash2, ArrowRight, AlertCircle, Columns3 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Dropdown, DropdownItem } from './ui/Dropdown';
-
-const COLUMNS: { id: Status; label: string }[] = [
-  { id: 'backlog', label: 'Backlog' },
-  { id: 'todo', label: 'To Do' },
-  { id: 'in-progress', label: 'In Progress' },
-  { id: 'review', label: 'Review' },
-  { id: 'done', label: 'Done' },
-];
+import { useProject } from '../contexts/ProjectContext';
+import { boardService } from '../services/boardService';
+import { taskService } from '../services/taskService';
 
 export function KanbanBoard() {
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
+  const { activeProject } = useProject();
+  const [columns, setColumns] = useState<ProjectColumn[]>([]);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
+
+  // Column management states
+  const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
+  const [editingColumn, setEditingColumn] = useState<ProjectColumn | null>(null);
+  const [isDeleteColumnModalOpen, setIsDeleteColumnModalOpen] = useState(false);
+  const [deletingColumn, setDeletingColumn] = useState<ProjectColumn | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -31,43 +38,168 @@ export function KanbanBoard() {
     })
   );
 
+  // Load board data
+  const loadBoard = async () => {
+    if (!activeProject?.id) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      const boardData = await boardService.getBoard(activeProject.id);
+
+      console.log('Board data received:', boardData);
+
+      // Ensure all columns have tasks array initialized
+      const columnsWithTasks = (boardData.columns || []).map(col => {
+        const tasks = Array.isArray(col.tasks) ? col.tasks : [];
+        console.log(`Column ${col.name}: ${tasks.length} tasks`, tasks);
+        return {
+          ...col,
+          tasks
+        };
+      });
+
+      setColumns(columnsWithTasks);
+    } catch (err: any) {
+      console.error('Failed to load board:', err);
+      setError(err.message || 'Failed to load board');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBoard();
+  }, [activeProject?.id]);
+
+  // Find task across all columns
+  const findTask = (taskId: string | number): Task | undefined => {
+    for (const column of columns) {
+      const task = column.tasks?.find(t => t.id === taskId);
+      if (task) return task;
+    }
+    return undefined;
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
-    const task = tasks.find((t) => t.id === event.active.id);
+    const task = findTask(event.active.id);
     if (task) setActiveTask(task);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over) return;
-
-    const taskId = active.id as string;
-    const newStatus = over.id as Status;
-
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
-    );
-    setActiveTask(null);
-  };
-
-  const handleAddTask = (taskData: Partial<Task>) => {
-    if (editingTask && editingTask.id) {
-      setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, ...taskData } as Task : t));
-      setEditingTask(null);
+    if (!over) {
+      setActiveTask(null);
       return;
     }
 
-    const newTask: Task = {
-      id: `NEX-${tasks.length + 1}`,
-      title: taskData.title || 'Untitled Task',
-      description: taskData.description || '',
-      status: taskData.status || 'todo',
-      priority: taskData.priority || 'medium',
-      assigneeId: taskData.assigneeId || MOCK_USERS[0].id,
-      dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString(),
-      tags: taskData.tags || [],
+    const taskId = active.id as string | number;
+    const newColumnId = over.id as string | number;
+    const task = findTask(taskId);
+
+    if (!task) {
+      setActiveTask(null);
+      return;
+    }
+
+    // Check if task is already in target column (compare both possible id formats)
+    const currentColumnId = task.projectColumnId || task.project_column_id;
+    if (String(currentColumnId) === String(newColumnId)) {
+      setActiveTask(null);
+      return;
+    }
+
+    // Optimistic update with projectColumnId updated
+    const updatedTask = {
+      ...task,
+      projectColumnId: newColumnId,
+      project_column_id: newColumnId
     };
-    setTasks([newTask, ...tasks]);
+
+    setColumns(prev =>
+      prev.map(col => {
+        const colTasks = Array.isArray(col.tasks) ? col.tasks : [];
+        return {
+          ...col,
+          tasks: col.id === newColumnId
+            ? [...colTasks, updatedTask]
+            : colTasks.filter(t => t.id !== taskId),
+          taskCount: col.id === newColumnId
+            ? (col.taskCount || 0) + 1
+            : String(col.id) === String(currentColumnId)
+              ? Math.max(0, (col.taskCount || 0) - 1)
+              : col.taskCount
+        };
+      })
+    );
+
+    try {
+      await boardService.moveTask(taskId, { projectColumnId: newColumnId });
+    } catch (err) {
+      console.error('Failed to move task:', err);
+      // Revert on error
+      await loadBoard();
+    } finally {
+      setActiveTask(null);
+    }
+  };
+
+  const handleAddTask = async (taskData: Partial<Task>) => {
+    if (!activeProject?.id) return;
+
+    try {
+      if (editingTask && editingTask.id) {
+        // Update existing task
+        const updated = await taskService.updateTask(editingTask.id, {
+          title: taskData.title,
+          description: taskData.description,
+          priority: taskData.priority,
+          assignee_id: taskData.assigneeId,
+          due_date: taskData.dueDate,
+        });
+
+        setColumns(prev =>
+          prev.map(col => {
+            const colTasks = Array.isArray(col.tasks) ? col.tasks : [];
+            return {
+              ...col,
+              tasks: colTasks.map(t => t.id === editingTask.id ? updated : t)
+            };
+          })
+        );
+        setEditingTask(null);
+      } else {
+        // Create new task
+        const columnId = editingColumnId || columns[0]?.id;
+        if (!columnId) return;
+
+        const newTask = await taskService.createTask({
+          title: taskData.title || 'Untitled Task',
+          description: taskData.description || '',
+          priority: taskData.priority || 'medium',
+          assignee_id: taskData.assigneeId,
+          project_id: activeProject.id,
+          project_column_id: columnId,
+          due_date: taskData.dueDate,
+        });
+
+        // Add task to the column
+        setColumns(prev =>
+          prev.map(col => {
+            const colTasks = Array.isArray(col.tasks) ? col.tasks : [];
+            return col.id === columnId
+              ? {
+                ...col,
+                tasks: [newTask, ...colTasks],
+                taskCount: (col.taskCount || 0) + 1
+              }
+              : col;
+          })
+        );
+      }
+    } catch (err) {
+      console.error('Failed to save task:', err);
+    }
   };
 
   const handleEditTask = (task: Task) => {
@@ -75,13 +207,115 @@ export function KanbanBoard() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteTask = (id: string) => {
-    setTasks(prev => prev.filter(t => t.id !== id));
+  const handleDeleteTask = async (id: string | number) => {
+    try {
+      await taskService.deleteTask(id);
+      setColumns(prev =>
+        prev.map(col => {
+          const colTasks = Array.isArray(col.tasks) ? col.tasks : [];
+          return {
+            ...col,
+            tasks: colTasks.filter(t => t.id !== id),
+            taskCount: Math.max(0, (col.taskCount || 0) - 1)
+          };
+        })
+      );
+    } catch (err) {
+      console.error('Failed to delete task:', err);
+    }
   };
 
-  const handleClearColumn = (status: Status) => {
-    setTasks(prev => prev.filter(t => t.status !== status));
+  const handleClearColumn = async (columnId: string | number) => {
+    if (!activeProject?.id) return;
+
+    try {
+      await boardService.clearColumn(activeProject.id, columnId);
+      setColumns(prev =>
+        prev.map(col =>
+          col.id === columnId
+            ? { ...col, tasks: [], taskCount: 0 }
+            : col
+        )
+      );
+    } catch (err) {
+      console.error('Failed to clear column:', err);
+    }
   };
+
+  const handleCreateColumn = async (data: { name: string; color?: string }) => {
+    if (!activeProject?.id) return;
+
+    try {
+      const newColumn = await boardService.createColumn(activeProject.id, {
+        name: data.name,
+        key: data.name.toLowerCase().replace(/\s+/g, '_'),
+        color: data.color,
+      });
+
+      setColumns(prev => [...prev, { ...newColumn, tasks: [] }]);
+      setIsColumnModalOpen(false);
+      setEditingColumn(null);
+    } catch (err) {
+      console.error('Failed to create column:', err);
+    }
+  };
+
+  const handleRenameColumn = async (columnId: string | number, data: { name: string; color?: string }) => {
+    if (!activeProject?.id) return;
+
+    try {
+      const updated = await boardService.updateColumn(activeProject.id, columnId, {
+        name: data.name,
+        color: data.color,
+      });
+
+      setColumns(prev =>
+        prev.map(col => col.id === columnId ? { ...col, ...updated } : col)
+      );
+      setIsColumnModalOpen(false);
+      setEditingColumn(null);
+    } catch (err) {
+      console.error('Failed to rename column:', err);
+    }
+  };
+
+  const handleDeleteColumn = async (targetColumnId?: string | number) => {
+    if (!activeProject?.id || !deletingColumn) return;
+
+    try {
+      // If column has tasks and a target column was selected, move tasks first
+      if (deletingColumn.taskCount > 0 && targetColumnId) {
+        await boardService.moveColumnTasks(activeProject.id, deletingColumn.id, {
+          targetColumnId,
+        });
+      }
+
+      await boardService.deleteColumn(activeProject.id, deletingColumn.id);
+
+      setColumns(prev => prev.filter(col => col.id !== deletingColumn.id));
+      setIsDeleteColumnModalOpen(false);
+      setDeletingColumn(null);
+    } catch (err) {
+      console.error('Failed to delete column:', err);
+    }
+  };
+
+  if (isLoading) {
+    return <KanbanBoardSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+          <p className="text-sm font-semibold text-red-600 mb-2">Failed to load board</p>
+          <p className="text-xs text-zinc-500 mb-4">{error}</p>
+          <Button onClick={loadBoard} size="sm">Try Again</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -90,10 +324,25 @@ export function KanbanBoard() {
           <h2 className="text-2xl font-bold">Project Board</h2>
           <p className="text-zinc-500 text-sm">Manage and track your team's progress</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <Plus className="w-4 h-4" />
-          Add Task
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => {
+              setEditingColumn(null);
+              setIsColumnModalOpen(true);
+            }}
+            variant="outline"
+          >
+            <Columns3 className="w-4 h-4" />
+            Add Column
+          </Button>
+          <Button onClick={() => {
+            setEditingColumnId(columns[0]?.id);
+            setIsModalOpen(true);
+          }}>
+            <Plus className="w-4 h-4" />
+            Add Task
+          </Button>
+        </div>
       </div>
 
       <DndContext
@@ -102,18 +351,24 @@ export function KanbanBoard() {
         onDragEnd={handleDragEnd}
       >
         <div className="flex gap-6 overflow-x-auto pb-6 flex-1 min-h-0">
-          {COLUMNS.map((column) => (
+          {columns.map((column) => (
             <Column
               key={column.id}
-              id={column.id}
-              label={column.label}
-              tasks={tasks.filter((t) => t.status === column.id)}
+              column={column}
               onDeleteTask={handleDeleteTask}
               onEditTask={handleEditTask}
               onClearColumn={() => handleClearColumn(column.id)}
               onAddTask={() => {
-                setEditingTask({ status: column.id } as Task);
+                setEditingColumnId(column.id);
                 setIsModalOpen(true);
+              }}
+              onRenameColumn={() => {
+                setEditingColumn(column);
+                setIsColumnModalOpen(true);
+              }}
+              onDeleteColumn={() => {
+                setDeletingColumn(column);
+                setIsDeleteColumnModalOpen(true);
               }}
             />
           ))}
@@ -129,38 +384,73 @@ export function KanbanBoard() {
         onClose={() => {
           setIsModalOpen(false);
           setEditingTask(null);
+          setEditingColumnId(null);
         }}
         onSave={handleAddTask}
         initialData={editingTask}
         title={editingTask && editingTask.id ? "Edit Task" : "Create New Task"}
+      />
+
+      <ColumnModal
+        isOpen={isColumnModalOpen}
+        onClose={() => {
+          setIsColumnModalOpen(false);
+          setEditingColumn(null);
+        }}
+        onSave={(data) => {
+          if (editingColumn) {
+            handleRenameColumn(editingColumn.id, data);
+          } else {
+            handleCreateColumn(data);
+          }
+        }}
+        initialData={editingColumn}
+        title={editingColumn ? "Rename Column" : "Create New Column"}
+      />
+
+      <DeleteColumnModal
+        isOpen={isDeleteColumnModalOpen}
+        onClose={() => {
+          setIsDeleteColumnModalOpen(false);
+          setDeletingColumn(null);
+        }}
+        onConfirm={handleDeleteColumn}
+        column={deletingColumn!}
+        availableColumns={columns.filter(col => col.id !== deletingColumn?.id)}
       />
     </div>
   );
 }
 
 interface ColumnProps {
-  id: Status;
-  label: string;
-  tasks: Task[];
-  onDeleteTask: (id: string) => void;
+  column: ProjectColumn;
+  onDeleteTask: (id: string | number) => void;
   onEditTask: (task: Task) => void;
   onClearColumn: () => void;
   onAddTask: () => void;
+  onRenameColumn: () => void;
+  onDeleteColumn: () => void;
   key?: React.Key;
 }
 
-function Column({ id, label, tasks, onDeleteTask, onEditTask, onClearColumn, onAddTask }: ColumnProps) {
+function Column({ column, onDeleteTask, onEditTask, onClearColumn, onAddTask, onRenameColumn, onDeleteColumn }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
-    id: id,
+    id: column.id,
   });
+
+  const tasks = Array.isArray(column.tasks) ? column.tasks : [];
+
+  if (!Array.isArray(tasks)) {
+    console.error(`Column ${column.name} tasks is not an array:`, column.tasks);
+  }
 
   return (
     <div className="flex flex-col w-72 shrink-0">
       <div className="flex items-center justify-between mb-4 px-1">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-sm">{label}</h3>
+          <h3 className="font-semibold text-sm">{column.name}</h3>
           <span className="bg-zinc-200 text-zinc-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-            {tasks.length}
+            {column.taskCount || tasks.length}
           </span>
         </div>
         <Dropdown
@@ -174,18 +464,18 @@ function Column({ id, label, tasks, onDeleteTask, onEditTask, onClearColumn, onA
             <Plus className="w-3.5 h-3.5" />
             Add Task
           </DropdownItem>
-          <DropdownItem>
+          <DropdownItem onClick={onRenameColumn}>
             <Edit2 className="w-3.5 h-3.5" />
             Rename Column
-          </DropdownItem>
-          <DropdownItem>
-            <ArrowRight className="w-3.5 h-3.5" />
-            Move All Tasks
           </DropdownItem>
           <div className="h-px bg-zinc-100 my-1" />
           <DropdownItem variant="danger" onClick={onClearColumn}>
             <Trash2 className="w-3.5 h-3.5" />
             Clear Column
+          </DropdownItem>
+          <DropdownItem variant="danger" onClick={onDeleteColumn}>
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete Column
           </DropdownItem>
         </Dropdown>
       </div>
@@ -201,8 +491,8 @@ function Column({ id, label, tasks, onDeleteTask, onEditTask, onClearColumn, onA
         {tasks.map((task) => (
           <TaskCard key={task.id} task={task} onDelete={onDeleteTask} onEdit={onEditTask} />
         ))}
-        
-        <button 
+
+        <button
           onClick={onAddTask}
           className="w-full py-2 flex items-center justify-center gap-2 text-zinc-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all text-xs font-medium border border-dashed border-zinc-300 hover:border-indigo-200"
         >

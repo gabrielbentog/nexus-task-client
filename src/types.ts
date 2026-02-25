@@ -29,6 +29,8 @@ export interface Task {
   assigneeId?: string | number;
   project_id?: number;
   projectId?: string | number;
+  project_column_id?: string | number;
+  projectColumnId?: string | number;
   due_date?: string;
   dueDate?: string;
   created_at?: string;
@@ -41,6 +43,7 @@ export interface Task {
   assignee?: User;
   project?: Project;
   subtasks?: Task[];
+  subtaskCount?: number;
 }
 
 export interface Project {
@@ -83,6 +86,7 @@ export interface CreateTaskRequest {
   priority?: Priority;
   assignee_id?: string | number;
   project_id: string | number;
+  project_column_id?: string | number;
   due_date?: string;
   parent_id?: string | number;
 }
@@ -106,4 +110,47 @@ export interface UpdateProjectRequest {
   name?: string;
   key?: string;
   description?: string;
+}
+
+export interface ProjectColumn {
+  id: string | number;
+  key: string;
+  name: string;
+  position: number;
+  color: string | null;
+  taskCount: number;
+  projectId?: string | number;
+  project_id?: string | number;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+  tasks?: Task[];
+}
+
+export interface BoardData {
+  columns: ProjectColumn[];
+}
+
+export interface CreateColumnRequest {
+  name: string;
+  key: string;
+  color?: string;
+}
+
+export interface UpdateColumnRequest {
+  name?: string;
+  color?: string;
+}
+
+export interface MoveTaskRequest {
+  projectColumnId: string | number;
+}
+
+export interface ReorderColumnRequest {
+  position: number;
+}
+
+export interface MoveTasksRequest {
+  targetColumnId: string | number;
 }
