@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
+import Cookies from 'js-cookie';
 
 export function Signup() {
   const [name, setName] = useState('');
@@ -14,17 +15,64 @@ export function Signup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            user: {
+              name,
+              email,
+              password,
+              password_confirmation: password,
+            },
+          }),
+        }
+      );
+
+      const data = await response.json();
       setIsLoading(false);
-      localStorage.setItem('isAuthenticated', 'true');
-      navigate('/');
-      window.location.reload();
-    }, 1000);
+
+      if (response.ok) {
+        // Pega o token do header Authorization (ou access-token, client, uid, etc)
+        const authToken = response.headers.get('Authorization') || response.headers.get('authorization') || response.headers.get('access-token');
+        if (authToken) {
+          Cookies.set('Authorization', authToken, { path: '/' });
+        } else {
+          // Para Devise Token Auth, pode ser múltiplos headers
+          const accessToken = response.headers.get('access-token');
+          const client = response.headers.get('client');
+          const uid = response.headers.get('uid');
+          if (accessToken && client && uid) {
+            Cookies.set('access-token', accessToken, { path: '/' });
+            Cookies.set('client', client, { path: '/' });
+            Cookies.set('uid', uid, { path: '/' });
+          }
+        }
+        // Salva user no sessionStorage
+        if (data && (data.user || data.id)) {
+          sessionStorage.setItem('user', JSON.stringify(data.user || data));
+        }
+        localStorage.setItem('isAuthenticated', 'true');
+        navigate('/');
+        window.location.reload();
+      } else {
+        alert((data && (data.errors?.join(', ') || data.error)) || 'Erro ao criar conta');
+      }
+    } catch (err) {
+      setIsLoading(false);
+      alert('Erro ao conectar com o servidor.');
+    }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA] p-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
