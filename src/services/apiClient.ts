@@ -19,6 +19,21 @@ const TOKEN_KEYS = {
     TOKEN_TYPE: 'token-type',
 };
 
+// Cookie helpers (simple implementation)
+const setCookie = (name: string, value: string, days = 7) => {
+    const expires = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
+};
+
+const getCookie = (name: string) => {
+    const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
+};
+
+const deleteCookie = (name: string) => {
+    document.cookie = `${name}=; Max-Age=0; path=/`;
+};
+
 // Get stored tokens
 export const getStoredTokens = () => {
     return {
@@ -30,7 +45,7 @@ export const getStoredTokens = () => {
     };
 };
 
-// Save tokens to localStorage
+// Save tokens to localStorage (and optionally save authorization header in a cookie)
 export const saveTokens = (headers: any) => {
     const accessToken = headers['access-token'];
     const client = headers['client'];
@@ -43,9 +58,15 @@ export const saveTokens = (headers: any) => {
     if (uid) localStorage.setItem(TOKEN_KEYS.UID, uid);
     if (expiry) localStorage.setItem(TOKEN_KEYS.EXPIRY, expiry);
     if (tokenType) localStorage.setItem(TOKEN_KEYS.TOKEN_TYPE, tokenType);
+
+    // some API responses may include a Bearer token in Authorization header
+    const authorization = headers['authorization'];
+    if (authorization) {
+        setCookie('authorization', authorization);
+    }
 };
 
-// Clear all tokens
+// Clear all tokens and remove authorization cookie
 export const clearTokens = () => {
     localStorage.removeItem(TOKEN_KEYS.ACCESS_TOKEN);
     localStorage.removeItem(TOKEN_KEYS.CLIENT);
@@ -53,9 +74,10 @@ export const clearTokens = () => {
     localStorage.removeItem(TOKEN_KEYS.EXPIRY);
     localStorage.removeItem(TOKEN_KEYS.TOKEN_TYPE);
     localStorage.removeItem('isAuthenticated');
+    deleteCookie('authorization');
 };
 
-// Check if user has valid tokens
+// Check if user has valid tokens (note: not checking authorization cookie here)
 export const hasValidTokens = () => {
     const tokens = getStoredTokens();
     return !!(tokens['access-token'] && tokens.client && tokens.uid);
@@ -71,6 +93,12 @@ apiClient.interceptors.request.use(
             config.headers['client'] = tokens.client;
             config.headers['uid'] = tokens.uid;
             config.headers['token-type'] = tokens['token-type'] || 'Bearer';
+        }
+
+        // include authorization cookie value if present
+        const authCookie = getCookie('authorization');
+        if (authCookie) {
+            config.headers['Authorization'] = authCookie;
         }
 
         return config;
