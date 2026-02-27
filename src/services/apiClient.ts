@@ -77,10 +77,12 @@ export const clearTokens = () => {
     deleteCookie('authorization');
 };
 
-// Check if user has valid tokens (note: not checking authorization cookie here)
+// Check if user has valid tokens or an authorization cookie
 export const hasValidTokens = () => {
     const tokens = getStoredTokens();
-    return !!(tokens['access-token'] && tokens.client && tokens.uid);
+    const hasTokens = !!(tokens['access-token'] && tokens.client && tokens.uid);
+    const hasAuthCookie = !!getCookie('authorization');
+    return hasTokens || hasAuthCookie;
 };
 
 // Request interceptor - Add auth tokens to every request
@@ -115,6 +117,10 @@ apiClient.interceptors.response.use(
         const headers = response.headers;
         if (headers['access-token']) {
             saveTokens(headers);
+        }
+        // also tokens may come via Authorization header
+        if (headers['authorization']) {
+            setCookie('authorization', headers['authorization']);
         }
 
         return response;

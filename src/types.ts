@@ -1,5 +1,7 @@
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
-export type Status = 'backlog' | 'todo' | 'in-progress' | 'review' | 'done';
+// statuses are dynamic per project; we store id for API interactions
+// and may receive a nested object from the backend
+
 
 // API Response Types
 export interface User {
@@ -23,7 +25,9 @@ export interface Task {
   id: string | number;
   title: string;
   description: string;
-  status: Status;
+  // status object returned by API (may include id, name, category, etc.)
+  status?: any;
+  status_id?: string | number;
   priority: Priority;
   assignee_id?: number;
   assigneeId?: string | number;
@@ -82,7 +86,7 @@ export interface ProjectMember {
 export interface CreateTaskRequest {
   title: string;
   description?: string;
-  status?: Status;
+  status_id?: string | number;
   priority?: Priority;
   assignee_id?: string | number;
   project_id: string | number;
@@ -94,7 +98,7 @@ export interface CreateTaskRequest {
 export interface UpdateTaskRequest {
   title?: string;
   description?: string;
-  status?: Status;
+  status_id?: string | number;
   priority?: Priority;
   assignee_id?: string | number;
   due_date?: string;
@@ -119,6 +123,8 @@ export interface ProjectColumn {
   position: number;
   color: string | null;
   taskCount: number;
+  category?: string;             // TODO, IN_PROGRESS, DONE
+  order?: number;
   projectId?: string | number;
   project_id?: string | number;
   createdAt?: string;
@@ -136,16 +142,15 @@ export interface CreateColumnRequest {
   name: string;
   key: string;
   color?: string;
+  category?: string; // TODO, IN_PROGRESS, DONE
 }
 
 export interface UpdateColumnRequest {
   name?: string;
   color?: string;
+  category?: string; // TODO, IN_PROGRESS, DONE
 }
 
-export interface MoveTaskRequest {
-  projectColumnId: string | number;
-}
 
 export interface ReorderColumnRequest {
   position: number;

@@ -24,6 +24,13 @@ export function KanbanBoard() {
   const [error, setError] = useState<string | null>(null);
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
 
+  // Build status dropdown options from loaded columns
+  const statusOptions = columns.map(col => ({
+    value: col.id,
+    label: col.name,
+    // optionally use color or category to choose icon later
+  }));
+
   // Column management states
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
   const [editingColumn, setEditingColumn] = useState<ProjectColumn | null>(null);
@@ -134,7 +141,8 @@ export function KanbanBoard() {
     );
 
     try {
-      await boardService.moveTask(taskId, { projectColumnId: newColumnId });
+      // update status_id instead of using remove endpoint
+      await boardService.moveTask(activeProject?.id, taskId, newColumnId);
     } catch (err) {
       console.error('Failed to move task:', err);
       // Revert on error
@@ -156,7 +164,8 @@ export function KanbanBoard() {
           priority: taskData.priority,
           assignee_id: taskData.assigneeId,
           due_date: taskData.dueDate,
-        });
+          status_id: taskData.status_id,
+        }, activeProject.id);
 
         setColumns(prev =>
           prev.map(col => {
@@ -181,6 +190,7 @@ export function KanbanBoard() {
           project_id: activeProject.id,
           project_column_id: columnId,
           due_date: taskData.dueDate,
+          status_id: taskData.status_id,
         });
 
         // Add task to the column
@@ -209,7 +219,7 @@ export function KanbanBoard() {
 
   const handleDeleteTask = async (id: string | number) => {
     try {
-      await taskService.deleteTask(id);
+      await taskService.deleteTask(id, activeProject?.id);
       setColumns(prev =>
         prev.map(col => {
           const colTasks = Array.isArray(col.tasks) ? col.tasks : [];
@@ -242,7 +252,7 @@ export function KanbanBoard() {
     }
   };
 
-  const handleCreateColumn = async (data: { name: string; color?: string }) => {
+  const handleCreateColumn = async (data: { name: string; color?: string; category: string }) => {
     if (!activeProject?.id) return;
 
     try {
@@ -250,6 +260,7 @@ export function KanbanBoard() {
         name: data.name,
         key: data.name.toLowerCase().replace(/\s+/g, '_'),
         color: data.color,
+        category: data.category,
       });
 
       setColumns(prev => [...prev, { ...newColumn, tasks: [] }]);
@@ -260,13 +271,14 @@ export function KanbanBoard() {
     }
   };
 
-  const handleRenameColumn = async (columnId: string | number, data: { name: string; color?: string }) => {
+  const handleRenameColumn = async (columnId: string | number, data: { name: string; color?: string; category: string }) => {
     if (!activeProject?.id) return;
 
     try {
       const updated = await boardService.updateColumn(activeProject.id, columnId, {
         name: data.name,
         color: data.color,
+        category: data.category,
       });
 
       setColumns(prev =>
@@ -389,6 +401,7 @@ export function KanbanBoard() {
         onSave={handleAddTask}
         initialData={editingTask}
         title={editingTask && editingTask.id ? "Edit Task" : "Create New Task"}
+        statusOptions={statusOptions}
       />
 
       <ColumnModal

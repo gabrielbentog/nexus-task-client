@@ -47,7 +47,9 @@ class AuthService {
                 authentication: credentials
             });
 
-            // Save tokens from headers
+            // Save tokens from headers (this helper will also persist any
+            // `Authorization` header value in a cookie so that subsequent
+            // requests can send it automatically)
             saveTokens(response.headers);
             localStorage.setItem('isAuthenticated', 'true');
 
@@ -75,7 +77,7 @@ class AuthService {
 
             const response = await apiClient.post<User>('/api/users', signupData);
 
-            // Save tokens from headers
+            // Save tokens from headers (authorization cookie is handled inside saveTokens)
             saveTokens(response.headers);
             localStorage.setItem('isAuthenticated', 'true');
 

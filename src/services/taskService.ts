@@ -22,38 +22,51 @@ export const taskService = {
     async getTasks(params?: GetTasksParams): Promise<Task[]> {
         const queryParams = new URLSearchParams();
 
-        if (params?.projectId) queryParams.append('project_id', params.projectId.toString());
         if (params?.status) queryParams.append('status', params.status);
         if (params?.assigneeId) queryParams.append('assignee_id', params.assigneeId.toString());
         if (params?.priority) queryParams.append('priority', params.priority);
         if (params?.search) queryParams.append('search', params.search);
 
-        const url = `/api/tasks${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        let url = '/api/tasks';
+        if (params?.projectId) {
+            url = `/api/projects/${params.projectId}/tasks`;
+        }
+        if (queryParams.toString()) {
+            url += `?${queryParams.toString()}`;
+        }
         const response = await apiClient.get(url);
         return response.data.data || response.data;
     },
 
     // Get a single task by ID
-    async getTask(id: string | number): Promise<Task> {
-        const response = await apiClient.get(`/api/tasks/${id}`);
+    async getTask(id: string | number, projectId?: string | number): Promise<Task> {
+        const url = projectId ? `/api/projects/${projectId}/tasks/${id}` : `/api/tasks/${id}`;
+        const response = await apiClient.get(url);
         return response.data.data || response.data;
     },
 
     // Create a new task
     async createTask(data: CreateTaskRequest): Promise<Task> {
-        const response = await apiClient.post('/api/tasks', { task: data });
+        // prefer nested project route
+        let url = '/api/tasks';
+        if (data.project_id) {
+            url = `/api/projects/${data.project_id}/tasks`;
+        }
+        const response = await apiClient.post(url, { task: data });
         return response.data.data || response.data;
     },
 
     // Update an existing task
-    async updateTask(id: string | number, data: UpdateTaskRequest): Promise<Task> {
-        const response = await apiClient.patch(`/api/tasks/${id}`, { task: data });
+    async updateTask(id: string | number, data: UpdateTaskRequest, projectId?: string | number): Promise<Task> {
+        const url = projectId ? `/api/projects/${projectId}/tasks/${id}` : `/api/tasks/${id}`;
+        const response = await apiClient.patch(url, { task: data });
         return response.data.data || response.data;
     },
 
     // Delete a task
-    async deleteTask(id: string | number): Promise<void> {
-        await apiClient.delete(`/api/tasks/${id}`);
+    async deleteTask(id: string | number, projectId?: string | number): Promise<void> {
+        const url = projectId ? `/api/projects/${projectId}/tasks/${id}` : `/api/tasks/${id}`;
+        await apiClient.delete(url);
     },
 
     // Assign a task to a user

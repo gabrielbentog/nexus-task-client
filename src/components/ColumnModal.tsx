@@ -6,7 +6,7 @@ import { ProjectColumn } from '../types';
 interface ColumnModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (data: { name: string; color?: string }) => void;
+    onSave: (data: { name: string; color?: string; category: string }) => void;
     initialData?: ProjectColumn | null;
     title?: string;
 }
@@ -14,11 +14,13 @@ interface ColumnModalProps {
 export function ColumnModal({ isOpen, onClose, onSave, initialData, title }: ColumnModalProps) {
     const [name, setName] = useState('');
     const [color, setColor] = useState('');
+    const [category, setCategory] = useState('TODO');
 
     useEffect(() => {
         if (isOpen) {
             setName(initialData?.name || '');
             setColor(initialData?.color || '');
+            setCategory(initialData?.category || 'TODO');
         }
     }, [isOpen, initialData]);
 
@@ -29,6 +31,7 @@ export function ColumnModal({ isOpen, onClose, onSave, initialData, title }: Col
         onSave({
             name: name.trim(),
             color: color || undefined,
+            category,
         });
 
         setName('');
@@ -52,6 +55,22 @@ export function ColumnModal({ isOpen, onClose, onSave, initialData, title }: Col
                     />
                     <p className="text-xs text-zinc-500 mt-1">
                         Choose a clear name for the workflow stage
+                    </p>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-semibold mb-2">Category</label>
+                    <select
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                    >
+                        <option value="TODO">To Do</option>
+                        <option value="IN_PROGRESS">In Progress</option>
+                        <option value="DONE">Done</option>
+                    </select>
+                    <p className="text-xs text-zinc-500 mt-1">
+                        Indicates which bucket tasks belong to; affects filtering and UI
                     </p>
                 </div>
 

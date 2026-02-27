@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { Task } from '../types';
 import { MOCK_TASKS, MOCK_USERS } from '../mockData';
 import { cn } from '../lib/utils';
-import { 
-  Search, 
-  Filter, 
-  ArrowUpDown, 
-  MoreHorizontal, 
-  Calendar, 
+import {
+  Search,
+  Filter,
+  ArrowUpDown,
+  MoreHorizontal,
+  Calendar,
   AlertCircle,
   Clock,
   CheckCircle2,
@@ -44,7 +44,7 @@ export function TasksTable() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const filteredTasks = tasks.filter(task => 
+  const filteredTasks = tasks.filter(task =>
     task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     task.id.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -59,7 +59,7 @@ export function TasksTable() {
       setEditingTask(null);
       return;
     }
-    
+
     // Handle creation if needed (though TasksTable currently only edits)
     const newTask: Task = {
       id: `NEX-${tasks.length + 1}`,
@@ -98,9 +98,9 @@ export function TasksTable() {
         <div className="p-4 border-b border-zinc-100 bg-zinc-50/50 flex items-center justify-between">
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-            <input 
-              type="text" 
-              placeholder="Search tasks..." 
+            <input
+              type="text"
+              placeholder="Search tasks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
@@ -126,7 +126,15 @@ export function TasksTable() {
             <tbody className="divide-y divide-zinc-50">
               {filteredTasks.map((task) => {
                 const assignee = MOCK_USERS.find(u => u.id === task.assigneeId);
-                const StatusIcon = statusConfig[task.status].icon;
+                // determine current status key for legacy cases or status object
+                let statusKey = '';
+                if (typeof task.status === 'string') {
+                  statusKey = task.status;
+                } else if (task.status && typeof task.status === 'object') {
+                  // maybe use category or name converted to key
+                  statusKey = task.status.category ? task.status.category.toLowerCase() : '';
+                }
+                const StatusIcon = statusConfig[statusKey]?.icon || statusConfig.todo.icon;
                 const priority = priorityConfig[task.priority];
                 const subtaskCount = task.subtasks?.length || 0;
 
@@ -135,13 +143,13 @@ export function TasksTable() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="flex flex-col min-w-0">
-                          <Link 
+                          <Link
                             to={`/tasks/${task.id}`}
                             className="text-xs font-bold text-indigo-600 mb-0.5 hover:text-indigo-700 transition-colors"
                           >
                             {task.id}
                           </Link>
-                          <Link 
+                          <Link
                             to={`/tasks/${task.id}`}
                             className="text-sm font-semibold text-zinc-900 line-clamp-1 hover:text-indigo-600 transition-colors"
                           >
@@ -158,8 +166,8 @@ export function TasksTable() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <StatusIcon className={cn("w-4 h-4", statusConfig[task.status].color)} />
-                        <span className="text-sm text-zinc-600">{statusConfig[task.status].label}</span>
+                        <StatusIcon className={cn("w-4 h-4", statusConfig[statusKey]?.color || statusConfig.todo.color)} />
+                        <span className="text-sm text-zinc-600">{statusConfig[statusKey]?.label || (task.status?.name || statusKey)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -188,7 +196,7 @@ export function TasksTable() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Dropdown 
+                      <Dropdown
                         trigger={
                           <button className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-lg transition-all">
                             <MoreHorizontal className="w-4 h-4" />
@@ -219,7 +227,7 @@ export function TasksTable() {
             </tbody>
           </table>
         </div>
-        
+
         {filteredTasks.length === 0 && (
           <div className="p-12 text-center">
             <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">

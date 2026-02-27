@@ -6,6 +6,12 @@ import { Task, Priority, Status } from '../types';
 import { MOCK_USERS, MOCK_TASKS } from '../mockData';
 import { AlertCircle, Clock, Flag, Layers } from 'lucide-react';
 
+interface Option {
+  value: string | number;
+  label: string;
+  icon?: React.ReactNode;
+}
+
 interface TaskModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -13,6 +19,8 @@ interface TaskModalProps {
   initialData?: Task | null;
   title: string;
   availableTasks?: Task[];
+  // statuses coming from current project
+  statusOptions?: Option[];
 }
 
 const priorityOptions = [
@@ -22,11 +30,10 @@ const priorityOptions = [
   { value: 'urgent', label: 'Urgent', icon: <Flag className="w-4 h-4 text-red-500" /> },
 ];
 
-const statusOptions = [
-  { value: 'backlog', label: 'Backlog', icon: <Clock className="w-4 h-4 text-zinc-400" /> },
+// fallback default list in case no project-specific statuses are passed
+const defaultStatusOptions: Option[] = [
   { value: 'todo', label: 'To Do', icon: <AlertCircle className="w-4 h-4 text-zinc-400" /> },
   { value: 'in-progress', label: 'In Progress', icon: <Clock className="w-4 h-4 text-indigo-500" /> },
-  { value: 'review', label: 'Review', icon: <Clock className="w-4 h-4 text-amber-500" /> },
   { value: 'done', label: 'Done', icon: <AlertCircle className="w-4 h-4 text-emerald-500" /> },
 ];
 
@@ -36,11 +43,11 @@ const userOptions = MOCK_USERS.map(user => ({
   icon: <img src={user.avatar} className="w-4 h-4 rounded-full" alt="" />
 }));
 
-export function TaskModal({ isOpen, onClose, onSave, initialData, title, availableTasks = MOCK_TASKS }: TaskModalProps) {
+export function TaskModal({ isOpen, onClose, onSave, initialData, title, availableTasks = MOCK_TASKS, statusOptions }: TaskModalProps) {
   const [taskTitle, setTaskTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
-  const [status, setStatus] = useState<Status>('todo');
+  const [statusId, setStatusId] = useState<string | number | undefined>(undefined);
   const [assigneeId, setAssigneeId] = useState(MOCK_USERS[0].id);
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [parentId, setParentId] = useState<string | undefined>(undefined);
@@ -61,7 +68,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, availab
       setTaskTitle(initialData.title || '');
       setDescription(initialData.description || '');
       setPriority(initialData.priority || 'medium');
-      setStatus(initialData.status || 'todo');
+      setStatusId(initialData.status_id || initialData.status?.id);
       setAssigneeId(initialData.assigneeId || MOCK_USERS[0].id);
       setDueDate(initialData.dueDate || new Date().toISOString().split('T')[0]);
       setParentId(initialData.parentId || '');
@@ -69,12 +76,13 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, availab
       setTaskTitle('');
       setDescription('');
       setPriority('medium');
-      setStatus('todo');
+      // default to first available status option if provided
+      setStatusId(statusOptions && statusOptions[0]?.value);
       setAssigneeId(MOCK_USERS[0].id);
       setDueDate(new Date().toISOString().split('T')[0]);
       setParentId('');
     }
-  }, [initialData, isOpen]);
+  }, [initialData, isOpen, statusOptions]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,7 +91,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, availab
       title: taskTitle,
       description,
       priority,
-      status,
+      status_id: statusId,
       assigneeId,
       dueDate,
       parentId: parentId || undefined,
@@ -120,9 +128,9 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, availab
         <div className="grid grid-cols-2 gap-4">
           <Select
             label="Status"
-            options={statusOptions}
-            value={status}
-            onChange={(val) => setStatus(val as Status)}
+            options={statusOptions || defaultStatusOptions}
+            value={statusId || ''}
+            onChange={(val) => setStatusId(val)}
           />
           <Select
             label="Priority"
