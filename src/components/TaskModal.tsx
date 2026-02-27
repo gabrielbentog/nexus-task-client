@@ -8,9 +8,10 @@ import { AlertCircle, Clock, Flag, Layers, Search } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
 import { taskService } from '../services/taskService';
 import { SearchableSelect } from './ui/SearchableSelect';
+import { projectService } from '../services/projectService';
 
 interface Option {
-  value: string | number;
+  value: string;
   label: string;
   icon?: React.ReactNode;
 }
@@ -37,8 +38,9 @@ const defaultStatusOptions: Option[] = [
   { value: 'done', label: 'Done', icon: <AlertCircle className="w-4 h-4 text-emerald-500" /> },
 ];
 
+
 const userOptions = MOCK_USERS.map(user => ({
-  value: user.id,
+  value: String(user.id),
   label: user.name,
   icon: <img src={user.avatar} className="w-4 h-4 rounded-full" alt="" />
 }));
@@ -49,10 +51,13 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
   const [taskTitle, setTaskTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
-  const [statusId, setStatusId] = useState<string | number | undefined>(undefined);
-  const [assigneeId, setAssigneeId] = useState(MOCK_USERS[0].id);
+  const [statusId, setStatusId] = useState<string | undefined>(undefined);
+  const [assigneeId, setAssigneeId] = useState<string>('');
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [parentId, setParentId] = useState<string | undefined>(undefined);
+  const [assigneeSearch, setAssigneeSearch] = useState('');
+  const [fetchedMembers, setFetchedMembers] = useState<any[]>([]);
+  const [isSearchingMembers, setIsSearchingMembers] = useState(false);
 
   // Novos estados para a busca da API
   const [parentSearch, setParentSearch] = useState('');
@@ -78,6 +83,24 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
     return () => clearTimeout(timer);
   }, [parentSearch, isOpen, activeProject?.id]);
 
+  useEffect(() => {
+    if (!isOpen || !activeProject?.id) return;
+
+    const timer = setTimeout(async () => {
+      setIsSearchingMembers(true);
+      try {
+        const members = await projectService.searchProjectMembers(activeProject.id, assigneeSearch);
+        setFetchedMembers(members);
+      } catch (error) {
+        console.error('Failed to fetch project members:', error);
+      } finally {
+        setIsSearchingMembers(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [assigneeSearch, isOpen, activeProject?.id]);
+
   // Memoização correta das opções para evitar lentidão no componente
   const parentOptions = useMemo(() => {
     return [
@@ -85,32 +108,55 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
       ...fetchedParentTasks
         .filter(t => t.id !== initialData?.id)
         .map(t => ({
-          value: t.id,
-          // Se t.code existir, exibe ele. Caso contrário, faz fallback pro t.id
+          value: String(t.id),
           label: `${t.code || t.id}: ${t.title}`,
           icon: <Layers className="w-4 h-4 text-indigo-500" />
         }))
     ];
   }, [fetchedParentTasks, initialData?.id]);
 
+  const assigneeOptions = useMemo(() => {
+    return [
+      { value: '', label: 'Unassigned', icon: <div className="w-4 h-4 rounded-full bg-zinc-200" /> },
+      ...fetchedMembers.map(member => {
+        // Extrai os dados do usuário, garantindo que pega do objeto aninhado 'user'
+        const userData = member.user;
+
+        if (!userData) return null;
+
+        return {
+          value: userData.id,
+          label: userData.name || userData.email,
+          icon: userData.avatar ? (
+            <img src={userData.avatar} className="w-4 h-4 rounded-full object-cover" alt="" />
+          ) : (
+            <div className="w-4 h-4 rounded-full bg-indigo-100 flex items-center justify-center text-[8px] font-bold text-indigo-700">
+              {(userData.name || userData.email || '?').charAt(0).toUpperCase()}
+            </div>
+          )
+        };
+      }).filter(Boolean) as Option[] // Filtra possíveis nulos caso algum membro não venha com o objeto user
+    ];
+  }, [fetchedMembers]);
+
   useEffect(() => {
     if (initialData) {
       setTaskTitle(initialData.title || '');
       setDescription(initialData.description || '');
       setPriority(initialData.priority || 'medium');
-      setStatusId(initialData.status_id || initialData.status?.id);
-      setAssigneeId(initialData.assigneeId || MOCK_USERS[0].id);
-      setDueDate(initialData.dueDate || new Date().toISOString().split('T')[0]);
-      setParentId(initialData.parentId || '');
+      setStatusId(initialData.status_id ? String(initialData.status_id) : (initialData.status?.id ? String(initialData.status?.id) : ''));
+      setAssigneeId(initialData.assignee?.id || initialData.assigneeId || '');
+      setDueDate(initialData.dueDate ? initialData.dueDate.split('T')[0] : new Date().toISOString().split('T')[0]);
+      setParentId(initialData.parent?.id || initialData.parentId || '');
     } else {
       setTaskTitle('');
       setDescription('');
       setPriority('medium');
       setStatusId(statusOptions && statusOptions[0]?.value);
-      setAssigneeId(MOCK_USERS[0].id);
+      setAssigneeId('');
       setDueDate(new Date().toISOString().split('T')[0]);
       setParentId('');
-      setParentSearch(''); // Limpa a busca ao abrir nova tarefa
+      setParentSearch('');
     }
   }, [initialData, isOpen, statusOptions]);
 
@@ -160,7 +206,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
             label="Status"
             options={statusOptions || defaultStatusOptions}
             value={statusId || ''}
-            onChange={(val) => setStatusId(val)}
+            onChange={(val) => setStatusId(String(val))}
           />
           <Select
             label="Priority"
@@ -177,7 +223,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
             options={parentOptions}
             value={parentId || ''}
             onChange={(val) => {
-              setParentId(val as string);
+              setParentId(String(val));
               setParentSearch(''); // Reseta a busca ao selecionar
             }}
             onSearch={setParentSearch}
@@ -187,11 +233,17 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <Select
+          <SearchableSelect
             label="Assignee"
-            options={userOptions}
-            value={assigneeId}
-            onChange={setAssigneeId}
+            options={assigneeOptions}
+            value={assigneeId || ''}
+            onChange={(val) => {
+              setAssigneeId(String(val));
+              setAssigneeSearch('');
+            }}
+            onSearch={setAssigneeSearch}
+            isLoading={isSearchingMembers}
+            placeholder="Search team member..."
           />
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider ml-1">Due Date</label>

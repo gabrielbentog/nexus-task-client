@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import { Project, CreateProjectRequest, UpdateProjectRequest } from '../types';
+import { Project, CreateProjectRequest, UpdateProjectRequest, User } from '../types';
 
 export const projectService = {
     // Get all projects for the authenticated user
@@ -48,5 +48,11 @@ export const projectService = {
     // Update member role
     async updateMemberRole(projectId: string | number, userId: string | number, role: string): Promise<void> {
         await apiClient.patch(`/api/projects/${projectId}/members/${userId}`, { role });
+    },
+
+    async searchProjectMembers(projectId: string | number, query: string = ''): Promise<User[]> {
+        const url = `/api/projects/${projectId}/members?q=${encodeURIComponent(query)}`;
+        const response = await apiClient.get(url);
+        return response.data.data || response.data;
     },
 };

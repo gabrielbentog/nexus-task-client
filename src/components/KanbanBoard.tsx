@@ -100,25 +100,29 @@ export function KanbanBoard() {
 
     const taskId = active.id as string | number;
     const newColumnId = over.id as string | number;
-    const task = findTask(taskId);
 
+    // SOLUÇÃO: Encontrar a coluna de origem olhando para o estado atual (onde a tarefa está renderizada agora)
+    const sourceColumn = columns.find(col => col.tasks?.some(t => t.id === taskId));
+    const currentColumnId = sourceColumn?.id;
+
+    // Se não achou a coluna de origem ou se soltou na mesma coluna, cancela
+    if (!sourceColumn || String(currentColumnId) === String(newColumnId)) {
+      setActiveTask(null);
+      return;
+    }
+
+    const task = sourceColumn.tasks?.find(t => t.id === taskId);
     if (!task) {
       setActiveTask(null);
       return;
     }
 
-    // Check if task is already in target column (compare both possible id formats)
-    const currentColumnId = task.projectColumnId || task.project_column_id;
-    if (String(currentColumnId) === String(newColumnId)) {
-      setActiveTask(null);
-      return;
-    }
-
-    // Optimistic update with projectColumnId updated
+    // Optimistic update com os IDs da nova coluna
     const updatedTask = {
       ...task,
       projectColumnId: newColumnId,
-      project_column_id: newColumnId
+      project_column_id: newColumnId,
+      status_id: newColumnId
     };
 
     setColumns(prev =>
@@ -126,10 +130,12 @@ export function KanbanBoard() {
         const colTasks = Array.isArray(col.tasks) ? col.tasks : [];
         return {
           ...col,
-          tasks: col.id === newColumnId
+          // Remove da antiga e adiciona na nova
+          tasks: String(col.id) === String(newColumnId)
             ? [...colTasks, updatedTask]
             : colTasks.filter(t => t.id !== taskId),
-          taskCount: col.id === newColumnId
+          // Atualiza o contador de forma explícita comparando com o currentColumnId que encontramos
+          taskCount: String(col.id) === String(newColumnId)
             ? (col.taskCount || 0) + 1
             : String(col.id) === String(currentColumnId)
               ? Math.max(0, (col.taskCount || 0) - 1)
@@ -143,7 +149,7 @@ export function KanbanBoard() {
       await boardService.moveTask(activeProject?.id, taskId, newColumnId);
     } catch (err) {
       console.error('Failed to move task:', err);
-      // Revert on error
+      // Reverte em caso de erro na API
       await loadBoard();
     } finally {
       setActiveTask(null);
@@ -155,7 +161,6 @@ export function KanbanBoard() {
 
     try {
       if (editingTask && editingTask.id) {
-        // Update existing task
         const updated = await taskService.updateTask(editingTask.id, {
           title: taskData.title,
           description: taskData.description,
@@ -166,13 +171,60 @@ export function KanbanBoard() {
           parent_id: taskData.parentId,
         }, activeProject.id);
 
+        const hasParent = !!taskData.parentId || !!updated.parent;
+        const targetColumnId = taskData.status_id || updated.status?.id || editingTask.project_column_id || editingTask.status_id;
+
+        const taskToRender = {
+          ...editingTask,
+          ...updated,
+          status_id: targetColumnId,
+          project_column_id: targetColumnId,
+          projectColumnId: targetColumnId
+        };
+
         setColumns(prev =>
           prev.map(col => {
             const colTasks = Array.isArray(col.tasks) ? col.tasks : [];
-            return {
-              ...col,
-              tasks: colTasks.map(t => t.id === editingTask.id ? updated : t)
-            };
+            const isOldColumn = colTasks.some(t => t.id === editingTask.id);
+            const isNewColumn = String(col.id) === String(targetColumnId);
+
+            // CENÁRIO A: A tarefa ganhou um pai, então deve sumir do Kanban
+            if (hasParent) {
+              if (isOldColumn) {
+                return {
+                  ...col,
+                  tasks: colTasks.filter(t => t.id !== editingTask.id),
+                  taskCount: Math.max(0, (col.taskCount || 0) - 1)
+                };
+              }
+              return col;
+            }
+
+            // CENÁRIO B: A tarefa mudou de coluna através do dropdown da modal
+            if (isOldColumn && !isNewColumn) {
+              return {
+                ...col,
+                tasks: colTasks.filter(t => t.id !== editingTask.id),
+                taskCount: Math.max(0, (col.taskCount || 0) - 1)
+              };
+            }
+            if (isNewColumn && !isOldColumn) {
+              return {
+                ...col,
+                tasks: [taskToRender, ...colTasks],
+                taskCount: (col.taskCount || 0) + 1
+              };
+            }
+
+            // CENÁRIO C: A tarefa continua na mesma coluna, apenas atualizamos os dados
+            if (isOldColumn && isNewColumn) {
+              return {
+                ...col,
+                tasks: colTasks.map(t => t.id === editingTask.id ? taskToRender : t)
+              };
+            }
+
+            return col;
           })
         );
         setEditingTask(null);

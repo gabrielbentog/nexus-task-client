@@ -30,6 +30,7 @@ export interface Task {
   code?: string;
   status_id?: string | number;
   priority: Priority;
+  parent: Task | null;
   assignee_id?: number;
   assigneeId?: string | number;
   project_id?: number;
