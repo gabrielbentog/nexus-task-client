@@ -4,6 +4,7 @@ import { Button } from './ui/Button';
 import { Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import Cookies from 'js-cookie';
+import { apiFetch } from '../lib/apiClient';
 
 export function Signup() {
   const [name, setName] = useState('');
@@ -16,7 +17,7 @@ export function Signup() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/users`,
         {
           method: 'POST',
