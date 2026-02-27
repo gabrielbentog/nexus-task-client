@@ -69,6 +69,7 @@ export function TasksTable() {
       priority: taskData.priority || 'medium',
       assigneeId: taskData.assigneeId || MOCK_USERS[0].id,
       dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
+      parentId: taskData.parentId,
       createdAt: new Date().toISOString(),
       tags: taskData.tags || [],
     };

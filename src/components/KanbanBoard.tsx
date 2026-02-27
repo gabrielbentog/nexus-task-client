@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core';
 import { Task, ProjectColumn } from '../types';
 import { TaskCard } from './TaskCard';
@@ -25,11 +25,10 @@ export function KanbanBoard() {
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
 
   // Build status dropdown options from loaded columns
-  const statusOptions = columns.map(col => ({
+  const statusOptions = useMemo(() => columns.map(col => ({
     value: col.id,
     label: col.name,
-    // optionally use color or category to choose icon later
-  }));
+  })), [columns]);
 
   // Column management states
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
@@ -59,7 +58,6 @@ export function KanbanBoard() {
       // Ensure all columns have tasks array initialized
       const columnsWithTasks = (boardData.columns || []).map(col => {
         const tasks = Array.isArray(col.tasks) ? col.tasks : [];
-        console.log(`Column ${col.name}: ${tasks.length} tasks`, tasks);
         return {
           ...col,
           tasks
@@ -165,6 +163,7 @@ export function KanbanBoard() {
           assignee_id: taskData.assigneeId,
           due_date: taskData.dueDate,
           status_id: taskData.status_id,
+          parent_id: taskData.parentId,
         }, activeProject.id);
 
         setColumns(prev =>
@@ -191,6 +190,7 @@ export function KanbanBoard() {
           project_column_id: columnId,
           due_date: taskData.dueDate,
           status_id: taskData.status_id,
+          parent_id: taskData.parentId,
         });
 
         // Add task to the column

@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
-import { Task, Priority, Status } from '../types';
-import { MOCK_USERS, MOCK_TASKS } from '../mockData';
-import { AlertCircle, Clock, Flag, Layers } from 'lucide-react';
+import { Task, Priority } from '../types';
+import { MOCK_USERS } from '../mockData';
+import { AlertCircle, Clock, Flag, Layers, Search } from 'lucide-react';
+import { useProject } from '../contexts/ProjectContext';
+import { taskService } from '../services/taskService';
+import { SearchableSelect } from './ui/SearchableSelect';
 
 interface Option {
   value: string | number;
@@ -18,8 +21,6 @@ interface TaskModalProps {
   onSave: (task: Partial<Task>) => void;
   initialData?: Task | null;
   title: string;
-  availableTasks?: Task[];
-  // statuses coming from current project
   statusOptions?: Option[];
 }
 
@@ -30,7 +31,6 @@ const priorityOptions = [
   { value: 'urgent', label: 'Urgent', icon: <Flag className="w-4 h-4 text-red-500" /> },
 ];
 
-// fallback default list in case no project-specific statuses are passed
 const defaultStatusOptions: Option[] = [
   { value: 'todo', label: 'To Do', icon: <AlertCircle className="w-4 h-4 text-zinc-400" /> },
   { value: 'in-progress', label: 'In Progress', icon: <Clock className="w-4 h-4 text-indigo-500" /> },
@@ -43,7 +43,9 @@ const userOptions = MOCK_USERS.map(user => ({
   icon: <img src={user.avatar} className="w-4 h-4 rounded-full" alt="" />
 }));
 
-export function TaskModal({ isOpen, onClose, onSave, initialData, title, availableTasks = MOCK_TASKS, statusOptions }: TaskModalProps) {
+export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusOptions }: TaskModalProps) {
+  const { activeProject } = useProject();
+
   const [taskTitle, setTaskTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
@@ -52,16 +54,44 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, availab
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [parentId, setParentId] = useState<string | undefined>(undefined);
 
-  const parentOptions = [
-    { value: '', label: 'None (Main Task)', icon: <Layers className="w-4 h-4 text-zinc-400" /> },
-    ...availableTasks
-      .filter(t => t.id !== initialData?.id && !t.parentId)
-      .map(t => ({
-        value: t.id,
-        label: `${t.id}: ${t.title}`,
-        icon: <Layers className="w-4 h-4 text-indigo-500" />
-      }))
-  ];
+  // Novos estados para a busca da API
+  const [parentSearch, setParentSearch] = useState('');
+  const [fetchedParentTasks, setFetchedParentTasks] = useState<Task[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Efeito com debounce para buscar tarefas pai na API
+  useEffect(() => {
+    if (!isOpen || !activeProject?.id) return;
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const tasks = await taskService.searchParentTasks(activeProject.id, parentSearch);
+        setFetchedParentTasks(tasks);
+      } catch (error) {
+        console.error('Failed to fetch parent tasks:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400); // 400ms de debounce para evitar spam na API
+
+    return () => clearTimeout(timer);
+  }, [parentSearch, isOpen, activeProject?.id]);
+
+  // Memoização correta das opções para evitar lentidão no componente
+  const parentOptions = useMemo(() => {
+    return [
+      { value: '', label: 'None (Main Task)', icon: <Layers className="w-4 h-4 text-zinc-400" /> },
+      ...fetchedParentTasks
+        .filter(t => t.id !== initialData?.id)
+        .map(t => ({
+          value: t.id,
+          // Se t.code existir, exibe ele. Caso contrário, faz fallback pro t.id
+          label: `${t.code || t.id}: ${t.title}`,
+          icon: <Layers className="w-4 h-4 text-indigo-500" />
+        }))
+    ];
+  }, [fetchedParentTasks, initialData?.id]);
 
   useEffect(() => {
     if (initialData) {
@@ -76,11 +106,11 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, availab
       setTaskTitle('');
       setDescription('');
       setPriority('medium');
-      // default to first available status option if provided
       setStatusId(statusOptions && statusOptions[0]?.value);
       setAssigneeId(MOCK_USERS[0].id);
       setDueDate(new Date().toISOString().split('T')[0]);
       setParentId('');
+      setParentSearch(''); // Limpa a busca ao abrir nova tarefa
     }
   }, [initialData, isOpen, statusOptions]);
 
@@ -140,12 +170,19 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, availab
           />
         </div>
 
+        {/* Nova seção de busca e seleção de Tarefa Pai */}
         <div className="grid grid-cols-1 gap-4">
-          <Select
+          <SearchableSelect
             label="Parent Task (Optional)"
             options={parentOptions}
             value={parentId || ''}
-            onChange={(val) => setParentId(val)}
+            onChange={(val) => {
+              setParentId(val as string);
+              setParentSearch(''); // Reseta a busca ao selecionar
+            }}
+            onSearch={setParentSearch}
+            isLoading={isSearching}
+            placeholder="Search to select parent task..."
           />
         </div>
 

@@ -113,4 +113,10 @@ export const taskService = {
         const response = await apiClient.get('/api/tasks/my');
         return response.data.data || response.data;
     },
+
+    async searchParentTasks(projectId: string | number, query: string = ''): Promise<Task[]> {
+        const url = `/api/projects/${projectId}/tasks?q=${encodeURIComponent(query)}&filter[parent_id]=null`;
+        const response = await apiClient.get(url);
+        return response.data.data || response.data;
+    },
 };

@@ -27,6 +27,7 @@ export interface Task {
   description: string;
   // status object returned by API (may include id, name, category, etc.)
   status?: any;
+  code?: string;
   status_id?: string | number;
   priority: Priority;
   assignee_id?: number;
@@ -102,6 +103,7 @@ export interface UpdateTaskRequest {
   priority?: Priority;
   assignee_id?: string | number;
   due_date?: string;
+  parent_id?: string | number;
 }
 
 export interface CreateProjectRequest {

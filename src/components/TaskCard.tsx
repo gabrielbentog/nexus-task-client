@@ -50,7 +50,7 @@ export function TaskCard({ task, onDelete, onEdit }: TaskCardProps) {
           onPointerDown={(e) => e.stopPropagation()}
           className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider hover:text-indigo-600 transition-colors"
         >
-          {task.id}
+          {task.code || `#${task.id}`}
         </Link>
         <div onPointerDown={(e) => e.stopPropagation()}>
           <Dropdown
