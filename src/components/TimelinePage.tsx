@@ -178,20 +178,33 @@ export function TimelinePage() {
         setIsCreateSprintModalOpen(true);
     };
 
-    // Create quick sprint (7 days from today)
+    // Create quick sprint (7 days from today or after last sprint)
     const handleCreateQuickSprint = async () => {
         if (!activeProject?.id) return;
 
-        const today = new Date();
-        const nextWeek = new Date(today);
-        nextWeek.setDate(today.getDate() + 7);
+        let startDay: Date;
 
+        // Start from day after last sprint, or today if no sprints
+        if (sprints.length > 0) {
+            const lastSprint = sprints[sprints.length - 1];
+            const lastSprintEnd = lastSprint.end_date || lastSprint.endDate;
+
+            if (lastSprintEnd) {
+                startDay = addDays(parseISO(lastSprintEnd), 1);
+            } else {
+                startDay = new Date();
+            }
+        } else {
+            startDay = new Date();
+        }
+
+        const endDay = addDays(startDay, 6); // 7 days total (inclusive)
         const sprintNumber = sprints.length + 1;
 
         await timelineService.createSprint(activeProject.id, {
             name: `Sprint ${sprintNumber}`,
-            start_date: today.toISOString().split('T')[0],
-            end_date: nextWeek.toISOString().split('T')[0],
+            start_date: startDay.toISOString().split('T')[0],
+            end_date: endDay.toISOString().split('T')[0],
             status: 'PLANNED',
         });
 
@@ -480,6 +493,7 @@ export function TimelinePage() {
                                     <div className="bg-zinc-50/50">
                                         {getTasksForEpic(epic.id).map((task) => {
                                             const taskStatus = getTaskStatus(task);
+                                            const assignee = task.assignee;
                                             return (
                                                 <div
                                                     key={task.id}
@@ -497,6 +511,27 @@ export function TimelinePage() {
                                                     </div>
                                                     <span className="text-xs text-zinc-600 truncate flex-1">{task.title}</span>
                                                     <span className="text-[9px] font-bold text-zinc-400 uppercase">{task.code || task.id}</span>
+                                                    {assignee ? (
+                                                        assignee.avatarUrl || assignee.avatar_url || assignee.avatar ? (
+                                                            <img
+                                                                src={assignee.avatarUrl || assignee.avatar_url || assignee.avatar}
+                                                                alt={assignee.name}
+                                                                className="w-5 h-5 rounded-full object-cover border border-zinc-200"
+                                                                title={assignee.name}
+                                                            />
+                                                        ) : (
+                                                            <div
+                                                                className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center border border-indigo-200"
+                                                                title={assignee.name}
+                                                            >
+                                                                <span className="text-[8px] font-bold text-indigo-700">
+                                                                    {(assignee.name || assignee.email || '?').charAt(0).toUpperCase()}
+                                                                </span>
+                                                            </div>
+                                                        )
+                                                    ) : (
+                                                        <div className="w-5 h-5 rounded-full bg-zinc-100 border border-zinc-200" title="Unassigned" />
+                                                    )}
                                                 </div>
                                             );
                                         })}
@@ -633,6 +668,38 @@ export function TimelinePage() {
                                     </div>
                                 );
                             })}
+
+                            {/* Quick Create Sprint Button - appears after last sprint */}
+                            {sprints.length > 0 && (() => {
+                                const lastSprint = sprints[sprints.length - 1];
+                                const lastSprintEnd = lastSprint.end_date || lastSprint.endDate;
+
+                                if (!lastSprintEnd) return null;
+
+                                const lastSprintEndDate = parseISO(lastSprintEnd);
+                                const nextDayAfterLastSprint = addDays(lastSprintEndDate, 1);
+                                const quickSprintEnd = addDays(nextDayAfterLastSprint, 6); // 7 days total
+
+                                const { left, width } = calculatePosition(
+                                    nextDayAfterLastSprint.toISOString().split('T')[0],
+                                    quickSprintEnd.toISOString().split('T')[0]
+                                );
+
+                                return (
+                                    <div
+                                        key="quick-create-sprint"
+                                        className="absolute top-2 h-8 rounded border-2 border-dashed border-indigo-300 bg-indigo-50/30 hover:bg-indigo-50 hover:border-indigo-400 flex items-center justify-center gap-2 cursor-pointer transition-all group"
+                                        style={{ left, width }}
+                                        onClick={handleCreateQuickSprint}
+                                        title="Create 7-day sprint"
+                                    >
+                                        <Plus className="w-4 h-4 text-indigo-500 group-hover:text-indigo-600 transition-colors" />
+                                        <span className="text-[9px] font-bold text-indigo-500 group-hover:text-indigo-600 uppercase tracking-tight transition-colors">
+                                            New Sprint
+                                        </span>
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         {/* Epic & Task Bars */}
