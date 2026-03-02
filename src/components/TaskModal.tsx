@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
-import { Task, Priority } from '../types';
+import { Task, Priority, Sprint } from '../types';
 import { MOCK_USERS } from '../mockData';
-import { AlertCircle, Clock, Flag, Layers, Search } from 'lucide-react';
+import { AlertCircle, Clock, Flag, Layers, Search, Zap } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
 import { taskService } from '../services/taskService';
 import { SearchableSelect } from './ui/SearchableSelect';
@@ -24,6 +24,7 @@ interface TaskModalProps {
   title: string;
   statusOptions?: Option[];
   fixedParentId?: string | number; // When provided, hides parent selection and uses this value
+  availableSprints?: Sprint[]; // Available sprints for selection
 }
 
 const priorityOptions = [
@@ -46,7 +47,7 @@ const userOptions = MOCK_USERS.map(user => ({
   icon: <img src={user.avatar} className="w-4 h-4 rounded-full" alt="" />
 }));
 
-export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusOptions, fixedParentId }: TaskModalProps) {
+export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusOptions, fixedParentId, availableSprints = [] }: TaskModalProps) {
   const { activeProject } = useProject();
 
   const [taskTitle, setTaskTitle] = useState('');
@@ -56,6 +57,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
   const [assigneeId, setAssigneeId] = useState<string>('');
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [parentId, setParentId] = useState<string | undefined>(undefined);
+  const [sprintId, setSprintId] = useState<string>('');
   const [assigneeSearch, setAssigneeSearch] = useState('');
   const [fetchedMembers, setFetchedMembers] = useState<any[]>([]);
   const [isSearchingMembers, setIsSearchingMembers] = useState(false);
@@ -140,15 +142,34 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
     ];
   }, [fetchedMembers]);
 
+  const sprintOptions = useMemo(() => {
+    return [
+      { value: '', label: 'No Sprint', icon: <Zap className="w-4 h-4 text-zinc-400" /> },
+      ...availableSprints.map(sprint => {
+        const status = (sprint.status || '').toLowerCase();
+        const iconColor = status === 'active' ? 'text-indigo-500' : status === 'completed' ? 'text-emerald-500' : 'text-zinc-400';
+
+        return {
+          value: String(sprint.id),
+          label: sprint.name,
+          icon: <Zap className={`w-4 h-4 ${iconColor}`} />
+        };
+      })
+    ];
+  }, [availableSprints]);
+
   useEffect(() => {
     if (initialData) {
       setTaskTitle(initialData.title || '');
       setDescription(initialData.description || '');
       setPriority(initialData.priority || 'medium');
-      setStatusId(initialData.status_id ? String(initialData.status_id) : (initialData.status?.id ? String(initialData.status?.id) : ''));
+      // Prioriza status.id (objeto) sobre status_id
+      const statusValue = initialData.status?.id || initialData.status_id;
+      setStatusId(statusValue ? String(statusValue) : '');
       setAssigneeId(initialData.assignee?.id || initialData.assigneeId || '');
       setDueDate(initialData.dueDate ? initialData.dueDate.split('T')[0] : new Date().toISOString().split('T')[0]);
       setParentId(initialData.parent?.id || initialData.parentId || '');
+      setSprintId(initialData.sprintId ? String(initialData.sprintId) : (initialData.sprint_id ? String(initialData.sprint_id) : ''));
     } else {
       setTaskTitle('');
       setDescription('');
@@ -157,6 +178,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
       setAssigneeId('');
       setDueDate(new Date().toISOString().split('T')[0]);
       setParentId('');
+      setSprintId('');
       setParentSearch('');
     }
   }, [initialData, isOpen, statusOptions]);
@@ -172,54 +194,48 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
       assigneeId,
       dueDate,
       parentId: fixedParentId ? String(fixedParentId) : (parentId || undefined),
+      sprintId: sprintId || undefined,
     });
     onClose();
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title}>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider ml-1">Task Title</label>
-          <input
-            type="text"
-            required
-            value={taskTitle}
-            onChange={(e) => setTaskTitle(e.target.value)}
-            placeholder="e.g. Implement user authentication"
-            className="w-full px-4 py-2.5 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
-          />
-        </div>
+    <Modal isOpen={isOpen} onClose={onClose} title={title} maxWidth="max-w-4xl">
+      <form onSubmit={handleSubmit} className="flex gap-6">
+        {/* Coluna Principal (Esquerda) */}
+        <div className="flex-1 space-y-6">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider ml-1">Task Title</label>
+            <input
+              type="text"
+              required
+              value={taskTitle}
+              onChange={(e) => setTaskTitle(e.target.value)}
+              placeholder="e.g. Implement user authentication"
+              className="w-full px-4 py-2.5 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+            />
+          </div>
 
-        <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider ml-1">Description</label>
-          <textarea
-            rows={3}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add more details about this task..."
-            className="w-full px-4 py-2.5 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all resize-none"
-          />
-        </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider ml-1">Description</label>
+            <textarea
+              rows={4}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add more details about this task..."
+              className="w-full px-4 py-2.5 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all resize-none"
+            />
+          </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Select
-            label="Status"
-            options={statusOptions || defaultStatusOptions}
-            value={statusId || ''}
-            onChange={(val) => setStatusId(String(val))}
-          />
           <Select
             label="Priority"
             options={priorityOptions}
             value={priority}
             onChange={(val) => setPriority(val as Priority)}
           />
-        </div>
 
-        {/* Nova seção de busca e seleção de Tarefa Pai - hidden when fixedParentId is provided */}
-        {!fixedParentId && (
-          <div className="grid grid-cols-1 gap-4">
+          {/* Nova seção de busca e seleção de Tarefa Pai - hidden when fixedParentId is provided */}
+          {!fixedParentId && (
             <SearchableSelect
               label="Parent Task (Optional)"
               options={parentOptions}
@@ -232,10 +248,27 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
               isLoading={isSearching}
               placeholder="Search to select parent task..."
             />
-          </div>
-        )}
+          )}
 
-        <div className="grid grid-cols-2 gap-4">
+          <div className="flex gap-3 pt-4 border-t border-zinc-100">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1">
+              {initialData ? 'Save Changes' : 'Create Task'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Coluna Lateral Direita - Info Card */}
+        <div className="w-72 space-y-4 p-4 bg-zinc-50/50 rounded-xl border border-zinc-200">
+          <Select
+            label="Status"
+            options={statusOptions || defaultStatusOptions}
+            value={statusId || ''}
+            onChange={(val) => setStatusId(String(val))}
+          />
+
           <SearchableSelect
             label="Assignee"
             options={assigneeOptions}
@@ -248,6 +281,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
             isLoading={isSearchingMembers}
             placeholder="Search team member..."
           />
+
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider ml-1">Due Date</label>
             <input
@@ -257,15 +291,13 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
               className="w-full px-4 py-2.5 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
             />
           </div>
-        </div>
 
-        <div className="flex gap-3 pt-4">
-          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" className="flex-1">
-            {initialData ? 'Save Changes' : 'Create Task'}
-          </Button>
+          <Select
+            label="Sprint"
+            options={sprintOptions}
+            value={sprintId || ''}
+            onChange={(val) => setSprintId(String(val))}
+          />
         </div>
       </form>
     </Modal>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import {
     ChevronRight,
@@ -24,6 +24,7 @@ import { CreateEpicModal } from './CreateEpicModal';
 import { CreateSprintModal } from './CreateSprintModal';
 import { TaskModal } from './TaskModal';
 import { taskService } from '../services/taskService';
+import { projectService } from '../services/projectService';
 
 export function TimelinePage() {
     const { activeProject } = useProject();
@@ -34,6 +35,7 @@ export function TimelinePage() {
     // State for API data
     const [timelineData, setTimelineData] = useState<TimelineData[]>([]);
     const [sprints, setSprints] = useState<Sprint[]>([]);
+    const [projectStatuses, setProjectStatuses] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +44,9 @@ export function TimelinePage() {
     const [isCreateSprintModalOpen, setIsCreateSprintModalOpen] = useState(false);
     const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
     const [selectedEpicForTask, setSelectedEpicForTask] = useState<string | number | null>(null);
+    const [editingTask, setEditingTask] = useState<Task | null>(null);
+    const [editingEpic, setEditingEpic] = useState<Task | null>(null);
+    const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
 
     // Drag and drop states for sprint assignment
     const [hoveredTaskRow, setHoveredTaskRow] = useState<string | number | null>(null);
@@ -65,13 +70,15 @@ export function TimelinePage() {
             setIsLoading(true);
             setError(null);
 
-            const [timelineResult, projectSprints] = await Promise.all([
+            const [timelineResult, projectSprints, statuses] = await Promise.all([
                 timelineService.getTimelineData(activeProject.id),
                 timelineService.getSprints(activeProject.id),
+                projectService.getProjectStatuses(activeProject.id),
             ]);
 
             setTimelineData(timelineResult);
             setSprints(projectSprints);
+            setProjectStatuses(statuses);
         } catch (err: any) {
             console.error('Failed to load timeline data:', err);
             setError(err.message || 'Falha ao carregar dados do timeline');
@@ -94,18 +101,37 @@ export function TimelinePage() {
     }) => {
         if (!activeProject?.id) return;
 
-        await timelineService.createEpic(activeProject.id, {
-            title: data.title,
-            description: data.description,
-            priority: data.priority,
-            start_date: data.startDate,
-            end_date: data.endDate,
-            status_id: data.statusId,
-            sprint_id: data.sprintId,
-        });
+        if (editingEpic?.id) {
+            // Modo de edição - usa taskService.updateTask
+            await taskService.updateTask(editingEpic.id, {
+                title: data.title,
+                description: data.description,
+                priority: data.priority as any,
+                due_date: data.endDate,
+                status_id: data.statusId,
+            }, activeProject.id);
+        } else {
+            // Modo de criação
+            await timelineService.createEpic(activeProject.id, {
+                title: data.title,
+                description: data.description,
+                priority: data.priority,
+                start_date: data.startDate,
+                end_date: data.endDate,
+                status_id: data.statusId,
+                sprint_id: data.sprintId,
+            });
+        }
 
         // Reload timeline data
         await loadTimelineData();
+        setEditingEpic(null);
+    };
+
+    // Open epic modal for editing
+    const handleEditEpic = (epic: Task) => {
+        setEditingEpic(epic);
+        setIsCreateEpicModalOpen(true);
     };
 
     // Handler to create a new sprint
@@ -119,13 +145,54 @@ export function TimelinePage() {
     }) => {
         if (!activeProject?.id) return;
 
+        if (editingSprint?.id) {
+            // Modo de edição
+            await timelineService.updateSprint(activeProject.id, editingSprint.id, {
+                name: data.name,
+                goal: data.goal,
+                start_date: data.startDate,
+                end_date: data.endDate,
+                status: data.status,
+                velocity: data.velocity,
+            });
+        } else {
+            // Modo de criação
+            await timelineService.createSprint(activeProject.id, {
+                name: data.name,
+                goal: data.goal,
+                start_date: data.startDate,
+                end_date: data.endDate,
+                status: data.status,
+                velocity: data.velocity,
+            });
+        }
+
+        // Reload timeline data
+        await loadTimelineData();
+        setEditingSprint(null);
+    };
+
+    // Open sprint modal for editing
+    const handleEditSprint = (sprint: Sprint) => {
+        setEditingSprint(sprint);
+        setIsCreateSprintModalOpen(true);
+    };
+
+    // Create quick sprint (7 days from today)
+    const handleCreateQuickSprint = async () => {
+        if (!activeProject?.id) return;
+
+        const today = new Date();
+        const nextWeek = new Date(today);
+        nextWeek.setDate(today.getDate() + 7);
+
+        const sprintNumber = sprints.length + 1;
+
         await timelineService.createSprint(activeProject.id, {
-            name: data.name,
-            goal: data.goal,
-            start_date: data.startDate,
-            end_date: data.endDate,
-            status: data.status,
-            velocity: data.velocity,
+            name: `Sprint ${sprintNumber}`,
+            start_date: today.toISOString().split('T')[0],
+            end_date: nextWeek.toISOString().split('T')[0],
+            status: 'PLANNED',
         });
 
         // Reload timeline data
@@ -145,15 +212,44 @@ export function TimelinePage() {
             due_date: taskData.dueDate,
             status_id: taskData.status_id,
             parent_id: selectedEpicForTask,
+            sprint_id: taskData.sprintId,
         });
 
         // Reload timeline data
         await loadTimelineData();
     };
 
+    // Handler to update an existing task
+    const handleUpdateTask = async (taskData: Partial<Task>) => {
+        if (!activeProject?.id || !editingTask?.id) return;
+
+        await taskService.updateTask(editingTask.id, {
+            title: taskData.title,
+            description: taskData.description,
+            priority: taskData.priority,
+            assignee_id: taskData.assigneeId,
+            due_date: taskData.dueDate,
+            status_id: taskData.status_id,
+            parent_id: taskData.parentId,
+            sprint_id: taskData.sprintId,
+        }, activeProject.id);
+
+        // Reload timeline data
+        await loadTimelineData();
+        setEditingTask(null);
+    };
+
     // Open task modal for specific epic
     const handleAddTaskToEpic = (epicId: string | number) => {
         setSelectedEpicForTask(epicId);
+        setEditingTask(null);
+        setIsCreateTaskModalOpen(true);
+    };
+
+    // Open task modal for editing
+    const handleEditTask = (task: Task) => {
+        setEditingTask(task);
+        setSelectedEpicForTask(null);
         setIsCreateTaskModalOpen(true);
     };
 
@@ -251,6 +347,23 @@ export function TimelinePage() {
         return colors[index % colors.length];
     };
 
+    // Helper to get task status from API response (may be object with category or direct string)
+    const getTaskStatus = (task: Task): string => {
+        if (typeof task.status === 'object' && task.status !== null) {
+            return (task.status.category || task.status.name || '').toLowerCase().replace('_', '-');
+        }
+        return (task.status || '').toLowerCase().replace('_', '-');
+    };
+
+    // Create status options from API data
+    const statusOptions = useMemo(() => {
+        return projectStatuses.map(status => ({
+            value: String(status.id),
+            label: status.name,
+            icon: undefined // Could add icons based on category later
+        }));
+    }, [projectStatuses]);
+
     // Helper to get color class for sprint based on status
     const getSprintColor = (sprint: Sprint | null) => {
         if (!sprint) return { bg: 'bg-indigo-100', border: 'border-indigo-400', text: 'text-indigo-700' };
@@ -342,37 +455,51 @@ export function TimelinePage() {
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                         {displayEpics.map((epic) => (
                             <div key={epic.id} className="border-b border-zinc-50 last:border-0">
-                                <button
-                                    onClick={() => toggleEpic(epic.id)}
-                                    className="w-full h-11 flex items-center gap-2 px-3 hover:bg-zinc-50 transition-colors group"
-                                >
-                                    {expandedEpics.includes(String(epic.id)) ? (
-                                        <ChevronDown className="w-4 h-4 text-zinc-400" />
-                                    ) : (
-                                        <ChevronRight className="w-4 h-4 text-zinc-400" />
-                                    )}
+                                <div className="w-full h-11 flex items-center gap-2 px-3 hover:bg-zinc-50 transition-colors group">
+                                    <button
+                                        onClick={() => toggleEpic(epic.id)}
+                                        className="p-1 hover:bg-zinc-100 rounded"
+                                    >
+                                        {expandedEpics.includes(String(epic.id)) ? (
+                                            <ChevronDown className="w-4 h-4 text-zinc-400" />
+                                        ) : (
+                                            <ChevronRight className="w-4 h-4 text-zinc-400" />
+                                        )}
+                                    </button>
                                     <div className={cn("w-2 h-2 rounded-full", getEpicColor(epic.id))} />
-                                    <span className="text-sm font-semibold text-zinc-900 truncate flex-1 text-left">{epic.title}</span>
+                                    <button
+                                        onClick={() => handleEditEpic(epic)}
+                                        className="text-sm font-semibold text-zinc-900 truncate flex-1 text-left hover:text-indigo-600 transition-colors"
+                                    >
+                                        {epic.title}
+                                    </button>
                                     <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded uppercase">{epic.code || epic.id}</span>
-                                </button>
+                                </div>
 
                                 {expandedEpics.includes(String(epic.id)) && (
                                     <div className="bg-zinc-50/50">
-                                        {getTasksForEpic(epic.id).map((task) => (
-                                            <div key={task.id} className="h-8 flex items-center gap-3 pl-10 pr-3 hover:bg-zinc-100/50 transition-colors cursor-pointer">
-                                                <div className="shrink-0">
-                                                    {task.status === 'done' ? (
-                                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                                                    ) : task.status === 'in-progress' ? (
-                                                        <Clock className="w-3.5 h-3.5 text-indigo-500" />
-                                                    ) : (
-                                                        <Circle className="w-3.5 h-3.5 text-zinc-300" />
-                                                    )}
+                                        {getTasksForEpic(epic.id).map((task) => {
+                                            const taskStatus = getTaskStatus(task);
+                                            return (
+                                                <div
+                                                    key={task.id}
+                                                    className="h-8 flex items-center gap-3 pl-10 pr-3 hover:bg-zinc-100/50 transition-colors cursor-pointer"
+                                                    onClick={() => handleEditTask(task)}
+                                                >
+                                                    <div className="shrink-0">
+                                                        {taskStatus === 'done' || taskStatus === 'completed' ? (
+                                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                                        ) : taskStatus === 'in-progress' || taskStatus === 'in-progress' ? (
+                                                            <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                                                        ) : (
+                                                            <Circle className="w-3.5 h-3.5 text-zinc-300" />
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs text-zinc-600 truncate flex-1">{task.title}</span>
+                                                    <span className="text-[9px] font-bold text-zinc-400 uppercase">{task.code || task.id}</span>
                                                 </div>
-                                                <span className="text-xs text-zinc-600 truncate flex-1">{task.title}</span>
-                                                <span className="text-[9px] font-bold text-zinc-400 uppercase">{task.code || task.id}</span>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                         <button
                                             className="w-full h-8 flex items-center gap-2 pl-10 text-[10px] font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider"
                                             onClick={() => handleAddTaskToEpic(epic.id)}
@@ -470,6 +597,7 @@ export function TimelinePage() {
                                             isTargetSprint ? "border-indigo-500 bg-indigo-50 scale-105" : "border-zinc-200 bg-white hover:border-indigo-300"
                                         )}
                                         style={{ left, width }}
+                                        onClick={() => handleEditSprint(sprint)}
                                         onDragOver={(e) => {
                                             if (draggedTask) {
                                                 e.preventDefault();
@@ -530,6 +658,7 @@ export function TimelinePage() {
                                                         ...calculatePosition(epicStart, epicEnd),
                                                         transformOrigin: 'left'
                                                     }}
+                                                    onClick={() => handleEditEpic(epic)}
                                                 >
                                                     <span className="text-[10px] font-bold text-white truncate drop-shadow-sm uppercase tracking-wider">
                                                         {epic.title}
@@ -540,18 +669,12 @@ export function TimelinePage() {
 
                                         {/* Task Bars (if expanded) */}
                                         {expandedEpics.includes(String(epic.id)) && getTasksForEpic(epic.id).map((task) => {
-                                            const suggestedSprint = getSuggestedSprint(task);
                                             // Verifica tanto sprintId (camelCase) quanto sprint_id (snake_case)
                                             const taskSprintId = task.sprintId || task.sprint_id;
                                             const taskSprint = taskSprintId
                                                 ? sprints.find(s => String(s.id) === String(taskSprintId))
                                                 : null;
 
-                                            // Ajuste na lógica de exibição:
-                                            // Sempre mostrar se tiver sprint, ou mostrar sugestão se estiver com mouse em cima
-                                            const overlaySprintToShow = (draggedTask?.id === task.id && targetSprint)
-                                                ? targetSprint
-                                                : (taskSprint || (hoveredTaskRow === task.id ? suggestedSprint : null));
                                             return (
                                                 <div
                                                     key={task.id}
@@ -561,57 +684,105 @@ export function TimelinePage() {
                                                 >
                                                     <div className="absolute inset-0 bg-zinc-50/0 group-hover:bg-zinc-50/50 transition-colors pointer-events-none" />
 
-
-                                                    {overlaySprintToShow && (() => {
-                                                        const sprintStart = overlaySprintToShow.start_date || overlaySprintToShow.startDate;
-                                                        const sprintEnd = overlaySprintToShow.end_date || overlaySprintToShow.endDate;
+                                                    {/* Renderiza um retângulo para cada sprint */}
+                                                    {sprints.map((sprint) => {
+                                                        const sprintStart = sprint.start_date || sprint.startDate;
+                                                        const sprintEnd = sprint.end_date || sprint.endDate;
 
                                                         if (!sprintStart || !sprintEnd) return null;
 
                                                         const { left, width } = calculatePosition(sprintStart, sprintEnd);
-                                                        const sprintColors = getSprintColor(taskSprint || overlaySprintToShow);
-                                                        const isPermanent = !!taskSprint;
+                                                        const isTaskInThisSprint = taskSprint?.id === sprint.id;
+                                                        const isDragTarget = draggedTask?.id === task.id && targetSprint?.id === sprint.id;
+                                                        const sprintColors = getSprintColor(sprint);
 
                                                         return (
                                                             <div
+                                                                key={sprint.id}
                                                                 className={cn(
-                                                                    "absolute top-1 h-6 rounded border-2 flex items-center px-2 cursor-pointer transition-all z-20",
-                                                                    isPermanent
-                                                                        ? `${sprintColors.bg} ${sprintColors.border}`
-                                                                        : "bg-indigo-50/40 border-dashed border-indigo-200"
+                                                                    "absolute top-1 h-6 rounded border-2 flex items-center justify-center px-2 transition-all z-20",
+                                                                    isTaskInThisSprint
+                                                                        ? `${sprintColors.bg} ${sprintColors.border} cursor-grab active:cursor-grabbing`
+                                                                        : isDragTarget
+                                                                            ? "bg-indigo-100 border-indigo-400 border-solid"
+                                                                            : "bg-transparent border-dashed border-zinc-200 hover:border-indigo-300 hover:bg-indigo-50/30 cursor-pointer opacity-0 group-hover:opacity-100"
                                                                 )}
                                                                 style={{ left, width }}
-                                                                onClick={() => handleAssignTaskToSprint(task, overlaySprintToShow)}
+                                                                draggable={isTaskInThisSprint}
+                                                                onDragStart={(e) => {
+                                                                    if (isTaskInThisSprint) {
+                                                                        setDraggedTask(task);
+                                                                        e.dataTransfer.effectAllowed = 'move';
+                                                                    }
+                                                                }}
+                                                                onDragEnd={() => {
+                                                                    setDraggedTask(null);
+                                                                    setTargetSprint(null);
+                                                                }}
+                                                                onDragOver={(e) => {
+                                                                    if (draggedTask && draggedTask.id !== task.id) return;
+                                                                    if (draggedTask && !isTaskInThisSprint) {
+                                                                        e.preventDefault();
+                                                                        setTargetSprint(sprint);
+                                                                    }
+                                                                }}
+                                                                onDragLeave={() => {
+                                                                    if (targetSprint?.id === sprint.id) {
+                                                                        setTargetSprint(null);
+                                                                    }
+                                                                }}
+                                                                onDrop={(e) => {
+                                                                    e.preventDefault();
+                                                                    if (draggedTask && draggedTask.id === task.id && !isTaskInThisSprint) {
+                                                                        handleAssignTaskToSprint(task, sprint);
+                                                                        setDraggedTask(null);
+                                                                        setTargetSprint(null);
+                                                                    }
+                                                                }}
+                                                                onClick={() => {
+                                                                    if (!isTaskInThisSprint && !draggedTask) {
+                                                                        handleAssignTaskToSprint(task, sprint);
+                                                                    }
+                                                                }}
                                                             >
-                                                                {/* INDICADOR DA COR DO ÉPICO DENTRO DA SPRINT */}
-                                                                <div className={cn("w-1.5 h-1.5 rounded-full mr-2 shrink-0", getEpicColor(epic.id))} />
+                                                                {isTaskInThisSprint ? (
+                                                                    <>
+                                                                        {/* Indicador de cor do épico */}
+                                                                        <div className={cn("w-1.5 h-1.5 rounded-full mr-2 shrink-0", getEpicColor(epic.id))} />
+                                                                        <span className={cn(
+                                                                            "text-[9px] font-bold uppercase tracking-tight truncate",
+                                                                            sprintColors.text
+                                                                        )}>
+                                                                            {task.code || task.id}
+                                                                        </span>
+                                                                    </>
+                                                                ) : (
+                                                                    <Plus className="w-3.5 h-3.5 text-zinc-400 group-hover:text-indigo-500 transition-colors" />
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
 
-                                                                <span className={cn(
-                                                                    "text-[9px] font-bold uppercase tracking-tight truncate",
-                                                                    isPermanent ? sprintColors.text : "text-indigo-400"
-                                                                )}>
-                                                                    {task.code || task.id}
+                                                    {/* Barra da Tarefa (Task Bar) - Renderiza por cima da sprint se houver datas específicas */}
+                                                    {task.startDate && task.dueDate && (() => {
+                                                        const taskStatus = getTaskStatus(task);
+                                                        return (
+                                                            <div
+                                                                className={cn(
+                                                                    "absolute top-1.5 h-5 rounded border flex items-center px-2 cursor-pointer hover:shadow-md transition-all z-30",
+                                                                    taskStatus === 'done' || taskStatus === 'completed' ? "bg-emerald-50 border-emerald-200 text-emerald-700" :
+                                                                        taskStatus === 'in-progress' || taskStatus === 'in-progress' ? "bg-indigo-50 border-indigo-200 text-indigo-700" :
+                                                                            "bg-white border-zinc-200 text-zinc-600"
+                                                                )}
+                                                                style={calculatePosition(task.startDate, task.dueDate)}
+                                                                onClick={() => handleEditTask(task)}
+                                                            >
+                                                                <span className="text-[9px] font-bold truncate uppercase tracking-tight">
+                                                                    {task.title}
                                                                 </span>
                                                             </div>
                                                         );
                                                     })()}
-
-                                                    {/* Barra da Tarefa (Task Bar) - Renderiza por cima da sprint se houver datas específicas */}
-                                                    {task.startDate && task.dueDate && (
-                                                        <div
-                                                            className={cn(
-                                                                "absolute top-1.5 h-5 rounded border flex items-center px-2 cursor-pointer hover:shadow-md transition-all z-30",
-                                                                task.status === 'done' ? "bg-emerald-50 border-emerald-200 text-emerald-700" :
-                                                                    task.status === 'in-progress' ? "bg-indigo-50 border-indigo-200 text-indigo-700" :
-                                                                        "bg-white border-zinc-200 text-zinc-600"
-                                                            )}
-                                                            style={calculatePosition(task.startDate, task.dueDate)}
-                                                        >
-                                                            <span className="text-[9px] font-bold truncate uppercase tracking-tight">
-                                                                {task.title}
-                                                            </span>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             );
                                         })}
@@ -669,24 +840,37 @@ export function TimelinePage() {
             {/* Modals */}
             <CreateEpicModal
                 isOpen={isCreateEpicModalOpen}
-                onClose={() => setIsCreateEpicModalOpen(false)}
+                onClose={() => {
+                    setIsCreateEpicModalOpen(false);
+                    setEditingEpic(null);
+                }}
                 onSubmit={handleCreateEpic}
                 availableSprints={sprints}
+                availableStatuses={projectStatuses}
+                initialData={editingEpic}
             />
             <CreateSprintModal
                 isOpen={isCreateSprintModalOpen}
-                onClose={() => setIsCreateSprintModalOpen(false)}
+                onClose={() => {
+                    setIsCreateSprintModalOpen(false);
+                    setEditingSprint(null);
+                }}
                 onSubmit={handleCreateSprint}
+                initialData={editingSprint}
             />
             <TaskModal
                 isOpen={isCreateTaskModalOpen}
                 onClose={() => {
                     setIsCreateTaskModalOpen(false);
                     setSelectedEpicForTask(null);
+                    setEditingTask(null);
                 }}
-                onSave={handleCreateTask}
-                title="Create Task"
+                onSave={editingTask ? handleUpdateTask : handleCreateTask}
+                title={editingTask ? 'Edit Task' : 'Create Task'}
+                initialData={editingTask}
                 fixedParentId={selectedEpicForTask || undefined}
+                availableSprints={sprints}
+                statusOptions={statusOptions}
             />
         </div>
     );

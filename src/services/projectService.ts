@@ -55,4 +55,10 @@ export const projectService = {
         const response = await apiClient.get(url);
         return response.data.data || response.data;
     },
+
+    // Get project statuses
+    async getProjectStatuses(projectId: string | number): Promise<any[]> {
+        const response = await apiClient.get(`/api/projects/${projectId}/statuses`);
+        return response.data.data || response.data;
+    },
 };

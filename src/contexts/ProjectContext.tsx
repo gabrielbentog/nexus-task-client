@@ -17,10 +17,23 @@ interface ProjectContextType {
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
-  const [activeProject, setActiveProject] = useState<Project | null>(null);
+  // Load active project from localStorage on mount
+  const [activeProject, setActiveProject] = useState<Project | null>(() => {
+    const saved = localStorage.getItem('activeProject');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Persist active project to localStorage whenever it changes
+  useEffect(() => {
+    if (activeProject) {
+      localStorage.setItem('activeProject', JSON.stringify(activeProject));
+    } else {
+      localStorage.removeItem('activeProject');
+    }
+  }, [activeProject]);
 
   const loadProjects = async () => {
     try {
@@ -30,10 +43,16 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       console.log('Projects loaded from API:', data);
       setProjects(data);
 
-      // Set active project if not set and projects exist
-      if (!activeProject && data.length > 0) {
-        console.log('Setting active project to:', data[0]);
-        setActiveProject(data.length > 0 ? data[0] : null);
+      // Verify if saved active project still exists, otherwise set first project
+      if (activeProject) {
+        const projectStillExists = data.find(p => p.id === activeProject.id);
+        if (!projectStillExists && data.length > 0) {
+          console.log('Saved project no longer exists, setting to first project:', data[0]);
+          setActiveProject(data[0]);
+        }
+      } else if (data.length > 0) {
+        console.log('No active project, setting to first:', data[0]);
+        setActiveProject(data[0]);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load projects');

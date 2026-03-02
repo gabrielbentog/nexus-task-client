@@ -123,6 +123,7 @@ export interface CreateTaskRequest {
   project_column_id?: string | number;
   due_date?: string;
   parent_id?: string | number;
+  sprint_id?: string | number;
 }
 
 export interface UpdateTaskRequest {
@@ -133,6 +134,7 @@ export interface UpdateTaskRequest {
   assignee_id?: string | number;
   due_date?: string;
   parent_id?: string | number;
+  sprint_id?: string | number;
 }
 
 export interface CreateProjectRequest {

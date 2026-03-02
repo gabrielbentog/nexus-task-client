@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
 import { Zap, Calendar, Target, AlertCircle, Loader2, TrendingUp } from 'lucide-react';
+import { Sprint } from '../types';
 
 interface CreateSprintModalProps {
     isOpen: boolean;
@@ -15,6 +16,7 @@ interface CreateSprintModalProps {
         status: string;
         velocity?: number;
     }) => Promise<void>;
+    initialData?: Sprint | null; // Dados iniciais para edição
 }
 
 const statusOptions = [
@@ -23,7 +25,7 @@ const statusOptions = [
     { value: 'COMPLETED', label: 'Completed', icon: <Target className="w-4 h-4 text-emerald-500" /> },
 ];
 
-export function CreateSprintModal({ isOpen, onClose, onSubmit }: CreateSprintModalProps) {
+export function CreateSprintModal({ isOpen, onClose, onSubmit, initialData }: CreateSprintModalProps) {
     const [name, setName] = useState('');
     const [goal, setGoal] = useState('');
     const [startDate, setStartDate] = useState('');
@@ -32,6 +34,27 @@ export function CreateSprintModal({ isOpen, onClose, onSubmit }: CreateSprintMod
     const [velocity, setVelocity] = useState<number | undefined>();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Atualiza os campos quando initialData muda (modo de edição)
+    useEffect(() => {
+        if (isOpen && initialData) {
+            setName(initialData.name || '');
+            setGoal((initialData as any).goal || '');
+            setStartDate(initialData.startDate?.split('T')[0] || initialData.start_date?.split('T')[0] || '');
+            setEndDate(initialData.endDate?.split('T')[0] || initialData.end_date?.split('T')[0] || '');
+            setStatus((initialData.status || 'PLANNED').toUpperCase());
+            setVelocity((initialData as any).velocity);
+        } else if (isOpen && !initialData) {
+            // Limpa os campos quando abre para criar novo
+            setName('');
+            setGoal('');
+            setStartDate('');
+            setEndDate('');
+            setStatus('PLANNED');
+            setVelocity(undefined);
+        }
+        setError(null);
+    }, [isOpen, initialData]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -100,7 +123,7 @@ export function CreateSprintModal({ isOpen, onClose, onSubmit }: CreateSprintMod
         : 0;
 
     return (
-        <Modal isOpen={isOpen} onClose={handleClose} title="Create New Sprint">
+        <Modal isOpen={isOpen} onClose={handleClose} title={initialData ? 'Edit Sprint' : 'Create New Sprint'}>
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="p-4 bg-indigo-50 rounded-2xl flex items-start gap-4 mb-2">
                     <div className="p-2 bg-white rounded-xl shadow-sm">
