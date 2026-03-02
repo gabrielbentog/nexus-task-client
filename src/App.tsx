@@ -7,6 +7,7 @@ import { TeamPage } from './components/TeamPage';
 import { TasksTable } from './components/TasksTable';
 import { SettingsPage } from './components/SettingsPage';
 import { TaskDetailPage } from './components/TaskDetailPage';
+import { TimelinePage } from './components/TimelinePage';
 import { Login } from './components/Login';
 import { Signup } from './components/Signup';
 import { ForgotPassword } from './components/ForgotPassword';
@@ -102,6 +103,19 @@ function MainApp() {
                       transition={{ duration: 0.2 }}
                     >
                       <TeamPage />
+                    </motion.div>
+                  }
+                />
+                <Route
+                  path="/timeline"
+                  element={
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <TimelinePage />
                     </motion.div>
                   }
                 />

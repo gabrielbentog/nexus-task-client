@@ -119,4 +119,31 @@ export const taskService = {
         const response = await apiClient.get(url);
         return response.data.data || response.data;
     },
+
+    async getTasksPaginated(params?: GetTasksParams & { page?: number; size?: number }): Promise<{ data: Task[], meta: any }> {
+        const queryParams = new URLSearchParams();
+
+        if (params?.status) queryParams.append('status', params.status);
+        if (params?.assigneeId) queryParams.append('assignee_id', params.assigneeId.toString());
+        if (params?.priority) queryParams.append('priority', params.priority);
+        if (params?.search) queryParams.append('search', params.search);
+
+        // Padrão Rails / JSON API
+        if (params?.page) queryParams.append('page[number]', params.page.toString());
+        if (params?.size) queryParams.append('page[size]', params.size.toString());
+
+        let url = '/api/tasks';
+        if (params?.projectId) {
+            url = `/api/projects/${params.projectId}/tasks`;
+        }
+        if (queryParams.toString()) {
+            url += `?${queryParams.toString()}`;
+        }
+
+        const response = await apiClient.get(url);
+        return {
+            data: response.data.data || response.data,
+            meta: response.data.meta || { current_page: 1, total_pages: 1 }
+        };
+    },
 };

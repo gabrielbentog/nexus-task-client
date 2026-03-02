@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Kanban, CheckSquare, Users, Settings, Plus, Search, Bell, Menu, ChevronDown, Check, LogOut, Settings as SettingsIcon, User as UserIcon, MessageSquare, CheckCircle2, AlertCircle, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Kanban, CheckSquare, Users, Settings, Plus, Search, Bell, Menu, ChevronDown, Check, LogOut, Settings as SettingsIcon, User as UserIcon, MessageSquare, CheckCircle2, AlertCircle, Clock, ChevronLeft, ChevronRight, CalendarIcon } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { Button } from './ui/Button';
@@ -10,6 +10,7 @@ import { CreateProjectModal } from './CreateProjectModal';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
+  { icon: CalendarIcon, label: 'Timeline', path: '/timeline' },
   { icon: Kanban, label: 'Board', path: '/board' },
   { icon: CheckSquare, label: 'Tasks', path: '/tasks' },
   { icon: Users, label: 'Team', path: '/team' },

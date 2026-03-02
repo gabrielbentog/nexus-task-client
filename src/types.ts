@@ -1,7 +1,21 @@
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
+export type TaskType = 'TASK' | 'EPIC';
 // statuses are dynamic per project; we store id for API interactions
 // and may receive a nested object from the backend
 
+export interface Sprint {
+  id: string | number;
+  name: string;
+  start_date?: string;
+  startDate?: string;
+  end_date?: string;
+  endDate?: string;
+  status?: 'active' | 'completed' | 'planned';
+  project_id?: string | number;
+  projectId?: string | number;
+  created_at?: string;
+  updated_at?: string;
+}
 
 // API Response Types
 export interface User {
@@ -50,6 +64,20 @@ export interface Task {
   project?: Project;
   subtasks?: Task[];
   subtaskCount?: number;
+  subtasks_count?: number;
+  task_type?: TaskType;
+  taskType?: TaskType;
+  sprint_id?: string | number;
+  sprintId?: string | number;
+  sprint?: Sprint;
+  points?: number;
+  display_id?: number;
+  displayId?: number;
+  // For timeline/epic visualization
+  start_date?: string;
+  startDate?: string;
+  end_date?: string;
+  endDate?: string;
 }
 
 export interface Project {

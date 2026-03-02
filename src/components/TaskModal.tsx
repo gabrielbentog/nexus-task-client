@@ -23,6 +23,7 @@ interface TaskModalProps {
   initialData?: Task | null;
   title: string;
   statusOptions?: Option[];
+  fixedParentId?: string | number; // When provided, hides parent selection and uses this value
 }
 
 const priorityOptions = [
@@ -45,7 +46,7 @@ const userOptions = MOCK_USERS.map(user => ({
   icon: <img src={user.avatar} className="w-4 h-4 rounded-full" alt="" />
 }));
 
-export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusOptions }: TaskModalProps) {
+export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusOptions, fixedParentId }: TaskModalProps) {
   const { activeProject } = useProject();
 
   const [taskTitle, setTaskTitle] = useState('');
@@ -170,7 +171,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
       status_id: statusId,
       assigneeId,
       dueDate,
-      parentId: parentId || undefined,
+      parentId: fixedParentId ? String(fixedParentId) : (parentId || undefined),
     });
     onClose();
   };
@@ -216,21 +217,23 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, title, statusO
           />
         </div>
 
-        {/* Nova seção de busca e seleção de Tarefa Pai */}
-        <div className="grid grid-cols-1 gap-4">
-          <SearchableSelect
-            label="Parent Task (Optional)"
-            options={parentOptions}
-            value={parentId || ''}
-            onChange={(val) => {
-              setParentId(String(val));
-              setParentSearch(''); // Reseta a busca ao selecionar
-            }}
-            onSearch={setParentSearch}
-            isLoading={isSearching}
-            placeholder="Search to select parent task..."
-          />
-        </div>
+        {/* Nova seção de busca e seleção de Tarefa Pai - hidden when fixedParentId is provided */}
+        {!fixedParentId && (
+          <div className="grid grid-cols-1 gap-4">
+            <SearchableSelect
+              label="Parent Task (Optional)"
+              options={parentOptions}
+              value={parentId || ''}
+              onChange={(val) => {
+                setParentId(String(val));
+                setParentSearch(''); // Reseta a busca ao selecionar
+              }}
+              onSearch={setParentSearch}
+              isLoading={isSearching}
+              placeholder="Search to select parent task..."
+            />
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <SearchableSelect
